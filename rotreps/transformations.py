@@ -12,9 +12,10 @@ Types:
     rotmat  - 3x3
     homo    - 4x4
     srq     - [ x, y, z, i, j, k]
-    sre     - [ x, y, z, i, j, k]
-    lrq     - [ x, y, z, yaw, pitch, roll ]
+    sre     - [ x, y, z, yaw, pitch, roll ]
+    lrq     - [ x, y, z, i, j, k ]
     lre     - [ x, y, z, yaw, pitch, roll ]
+    lrQ     - [ x, y, z, re, i, j, k ]
 """
 import numpy as np
 
@@ -151,6 +152,9 @@ def apply_sre(sre,v):
 def apply_lre(lre,v):
     return  apply_euler(lre[3:], v - lre[:3])
 
+def apply_lrQ(lrQ,v):
+    return  apply_quat(lrQ[3:], v - lrQ[:3])
+
 
 # -------------
 #  Inversions
@@ -163,6 +167,12 @@ def invert_redquat(rq):
     return -rq
 
 def invert_quat(q):
+    return np.array([
+        q[0],
+        -q[1],
+        -q[2],
+        -q[3],
+    ])
     return redquat2quat(-quat2redquat(q))
 
 def invert_euler(euler):
@@ -195,6 +205,19 @@ def invert_lrq(lrq):
         rqinv[2],
     ])
 
+def invert_lrQ(lrQ):
+    rinv = invert_quat(lrQ[3:])
+    location = -apply_quat(lrQ[3:], lrQ[:3])
+    return np.array([
+        location[0],
+        location[1],
+        location[2],
+        rinv[0],
+        rinv[1],
+        rinv[2],
+        rinv[3],
+    ])
+
 def invert_sre(sre):
     return homo2sre(invert_homo(sre2homo(sre)))
 
@@ -218,6 +241,16 @@ def srq2homo(srq):
 def lrq2homo(lrq):
     shift = -np.array(lrq[:3])
     R = redquat2rotmat(lrq[3:])
+
+    H = np.eye(4)
+    H[:3,:3] = R
+    H[:3,3] = apply_rotmat(R, shift) # map shift to shift_prime
+
+    return H
+
+def lrQ2homo(lrQ):
+    shift = -np.array(lrQ[:3])
+    R = quat2rotmat(lrQ[3:])
 
     H = np.eye(4)
     H[:3,:3] = R
@@ -271,6 +304,20 @@ def homo2lrq(H):
         rq[2]
     ])
 
+def homo2lrQ(H):
+    r = rotmat2quat(H[:3,:3])[1:]
+    shift = apply_quat(-r, H[:3,3]) # map shift_prime to shift
+
+    return np.array([
+        -shift[0],
+        -shift[1],
+        -shift[2],
+        r[0],
+        r[1],
+        r[2],
+        r[3]
+    ])
+
 
 def homo2sre(H):
     e = rotmat2euler(H[:3,:3])
@@ -296,6 +343,31 @@ def homo2lre(H):
         e[0],
         e[1],
         e[2]
+    ])
+
+def lre2lrQ(lre):
+    q = euler2quat(lre[3:])
+
+    return np.array([
+        lre[0],
+        lre[1],
+        lre[2],
+        q[0],
+        q[1],
+        q[2],
+        q[3]
+    ])
+
+def lrQ2lre(lrQ):
+    e = quat2euler(lrQ[3:])
+
+    return np.array([
+        lrQ[0],
+        lrQ[1],
+        lrQ[2],
+        e[0],
+        e[1],
+        e[2],
     ])
 
 # ------------------------------------------
@@ -343,6 +415,20 @@ def compose_lrq(lrq1, lrq2):
         rq3[0],
         rq3[1],
         rq3[2],
+    ])
+
+def compose_lrQ(lrQ1, lrQ2):
+    q1 = lrQ1[3:]
+    q3 = compose_quat(q1, lrQ2[3:])
+    location3 = lrQ1[:3] + apply_quat(invert_quat(q1), lrQ2[:3])
+    return np.array([
+        location3[0],
+        location3[1],
+        location3[2],
+        q3[0],
+        q3[1],
+        q3[2],
+        q3[3],
     ])
 
 def compose_sre(sre1, sre2):

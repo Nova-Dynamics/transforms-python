@@ -12,9 +12,10 @@ Types:
     rotmat  - 3x3
     homo    - 4x4
     srq     - [ x, y, z, i, j, k]
-    sre     - [ x, y, z, i, j, k]
-    lrq     - [ x, y, z, yaw, pitch, roll ]
+    sre     - [ x, y, z, yaw, pitch, roll ]
+    lrq     - [ x, y, z, i, j, k]
     lre     - [ x, y, z, yaw, pitch, roll ]
+    lrQ     - [ x, y, z, re, i, j, k]
 """
 import sympy as sp
 
@@ -78,6 +79,10 @@ def apply_quat(q,v):
 def apply_lrq(lrq,v):
     return  apply_redquat(lrq[3:], [ a-b for a,b in zip(v,lrq[:3]) ] )
 
+def apply_lrQ(lrQ,v):
+    return  apply_quat(lrQ[3:], [ a-b for a,b in zip(v,lrQ[:3]) ] )
+
+
 
 # -------------
 #  Inversions
@@ -87,7 +92,12 @@ def invert_redquat(rq):
     return [ -v for v in rq ]
 
 def invert_quat(q):
-    return redquat2quat([ -v for v in quat2redquat(q) ])
+    return [
+        q[0],
+        -q[1],
+        -q[2],
+        -q[3]
+    ]
 
 def invert_lrq(lrq):
     rqinv = invert_redquat(lrq[3:])
@@ -99,6 +109,19 @@ def invert_lrq(lrq):
         rqinv[0],
         rqinv[1],
         rqinv[2],
+    ]
+
+def invert_lrQ(lrQ):
+    rinv = invert_quat(lrQ[3:])
+    location = [ -v for v in apply_quat(lrQ[3:], lrQ[:3]) ]
+    return [
+        location[0],
+        location[1],
+        location[2],
+        rinv[0],
+        rinv[1],
+        rinv[2],
+        rinv[3],
     ]
 
 def invert_euler(euler):
@@ -134,6 +157,20 @@ def compose_lrq(lrq1, lrq2):
         rq3[2],
     ]
 
+def compose_lrQ(lrQ1, lrQ2):
+    q1 = lrQ1[3:]
+    q3 = compose_quat(q1, lrQ2[3:])
+    location3 = [ a+b for a,b in zip(lrQ1[:3],apply_quat(invert_quat(q1), lrQ2[:3])) ]
+    return [
+        location3[0],
+        location3[1],
+        location3[2],
+        q3[0],
+        q3[1],
+        q3[2],
+        q3[3],
+    ]
+
 def compose_lre(lre1, lre2):
     return lrq2lre(compose_lrq(lre2lrq(lre1), lre2lrq(lre2)))
 
@@ -155,6 +192,29 @@ def lrq2lre(lrq):
         lrq[0],
         lrq[1],
         lrq[2],
+        e[0],
+        e[1],
+        e[2],
+    ]
+
+def lre2lrQ(lre):
+    q = euler2quat(lre[3:])
+    return [
+        lre[0],
+        lre[1],
+        lre[2],
+        q[0],
+        q[1],
+        q[2],
+        q[3],
+    ]
+
+def lrQ2lre(lrQ):
+    e = quat2euler(lrQ[3:])
+    return [
+        lrQ[0],
+        lrQ[1],
+        lrQ[2],
         e[0],
         e[1],
         e[2],
