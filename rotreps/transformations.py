@@ -144,16 +144,16 @@ def apply_srq(srq,v):
     return  apply_redquat(srq[3:], v + srq[:3])
 
 def apply_lrq(lrq,v):
-    return  apply_redquat(lrq[3:], v - lrq[:3])
+    return apply_redquat(lrq[3:], v - lrq[:3])
 
 def apply_sre(sre,v):
-    return  apply_euler(sre[3:], v + sre[:3])
+    return apply_euler(sre[3:], v + sre[:3])
 
 def apply_lre(lre,v):
-    return  apply_euler(lre[3:], v - lre[:3])
+    return apply_euler(lre[3:], v - lre[:3])
 
 def apply_lrQ(lrQ,v):
-    return  apply_quat(lrQ[3:], v - lrQ[:3])
+    return apply_quat(lrQ[3:], v - lrQ[:3])
 
 
 # -------------
@@ -344,6 +344,32 @@ def homo2lre(H):
         e[1],
         e[2]
     ])
+
+def lrq2lrQ(lrq):
+    q = redquat2quat(lrq[3:])
+
+    return np.array([
+        lrq[0],
+        lrq[1],
+        lrq[2],
+        q[0],
+        q[1],
+        q[2],
+        q[3]
+    ])
+
+def lrQ2lrq(lrQ):
+    rq = quat2redquat(lrQ[3:])
+
+    return np.array([
+        lrQ[0],
+        lrQ[1],
+        lrQ[2],
+        rq[0],
+        rq[1],
+        rq[2],
+    ])
+
 
 def lre2lrQ(lre):
     q = euler2quat(lre[3:])
