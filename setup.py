@@ -1,7 +1,12 @@
 from distutils.core import setup, Extension
 
-with open("transforms/__version__.py") as f:
+with open("transforms/version.py") as f:
     exec(f.readline())
+
+reqs = []
+with open("requirements.txt") as f:
+    for l in f:
+        reqs.append(l.strip())
 
 def main():
     setup(
@@ -10,6 +15,7 @@ def main():
         description="", # TODO
         author="Jonathan D. B. Van Schenck",
         author_email="jvschenck@novadynamics.com",
+        install_requires=reqs,
         ext_modules=[
             Extension("utils_wrapper", [
                 "transforms/utils/wrapper.cpp",
