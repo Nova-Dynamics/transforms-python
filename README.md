@@ -8,8 +8,11 @@ pip3 install robotransforms
 
 ## Development
 ```bash
+# Testing
 ./venv/bin/python3 setup.py install
-./venv/bin/python3 setup.py sdist
-./venv/bin/twine upload dist/*
+
+# Building (don't worry about wheels)
+python3 -m build --sdist
+twine upload dist/*
 ```
 

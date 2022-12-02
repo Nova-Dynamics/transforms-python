@@ -5,3 +5,4 @@ build
 test.py
 tests
 venv
+*.egg-info

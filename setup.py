@@ -1,5 +1,5 @@
 import re
-from distutils.core import setup, Extension
+from setuptools import setup, Extension
 
 with open("robotransforms/_version.py") as f:
     exec(f.read())
@@ -16,6 +16,7 @@ def main():
         version=__version__,
         description="A transformation library for robot motion", # TODO
         long_description=readme,
+        long_description_content_type="text/markdown",
         author="Jonathan D. B. Van Schenck",
         author_email="jvschenck@novadynamics.com",
         license="MIT",
