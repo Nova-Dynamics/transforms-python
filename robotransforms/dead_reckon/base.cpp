@@ -132,7 +132,7 @@ namespace dead_reckon {
             // Also add in the last two elements
             Z[(i+1)*n + SS + 0] = z[SS + 0] + R[i*L + SM + 0];
             Z[(i+1)*n + SS + 1] = z[SS + 1] + R[i*L + SM + 1];
-            Z[(i+L+1)*n + SS + 1] = z[SS + 1] - R[i*L + SM + 1];
+            Z[(i+L+1)*n + SS + 0] = z[SS + 0] - R[i*L + SM + 0];
             Z[(i+L+1)*n + SS + 1] = z[SS + 1] - R[i*L + SM + 1];
         }
 

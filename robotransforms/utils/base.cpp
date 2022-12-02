@@ -44,6 +44,9 @@ constexpr double L_PLUS_LAMBDA = 3;
 namespace utils {
     int cholesky ( int n, double *mat, double *R ) {
         for (int i = 0; i < n; i ++ ) {
+            for (int j = 0; j < i; j ++ ) {
+                R[n*i + j] = 0;
+            }
             for (int j = i; j < n; j ++ ) {
                 R[n*i + j] = mat[n*i + j];
             }
@@ -52,6 +55,9 @@ namespace utils {
     };
     int cholesky ( int n, double scale, double *mat, double *R ) {
         for (int i = 0; i < n; i ++ ) {
+            for (int j = 0; j < i; j ++ ) {
+                R[n*i + j] = 0;
+            }
             for (int j = i; j < n; j ++ ) {
                 R[n*i + j] = scale * mat[n*i + j];
             }
