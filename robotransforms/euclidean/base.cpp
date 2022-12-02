@@ -1,5 +1,6 @@
 #include "base.h"
 #include <math.h>
+#include <algorithm>
 
 // Many thanks to https://stackoverflow.com/a/9324086/13217806
 double clip(double n, double lower, double upper) {

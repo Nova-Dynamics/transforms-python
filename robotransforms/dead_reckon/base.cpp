@@ -1,5 +1,5 @@
 #include <math.h>
-#include <cstdio>
+#include <algorithm>
 
 #include "../utils/base.h"
 #include "../euclidean/base.h"
