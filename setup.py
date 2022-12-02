@@ -1,35 +1,48 @@
+import re
 from distutils.core import setup, Extension
 
-with open("transforms/version.py") as f:
-    exec(f.readline())
+with open("robotransforms/_version.py") as f:
+    exec(f.read())
 
-reqs = []
-with open("requirements.txt") as f:
-    for l in f:
-        reqs.append(l.strip())
+try:
+    with open("README.md") as f:
+        readme = f.read()
+except:
+    readme = ""
 
 def main():
     setup(
-        name="transforms",
+        name="robotransforms",
         version=__version__,
-        description="", # TODO
+        description="A transformation library for robot motion", # TODO
+        long_description=readme,
         author="Jonathan D. B. Van Schenck",
         author_email="jvschenck@novadynamics.com",
-        install_requires=reqs,
+        license="MIT",
+        url="https://github.com/Nova-Dynamics/transforms-python",
+        packages=[
+            "robotransforms",
+            "robotransforms.utils",
+            "robotransforms.dead_reckon",
+            "robotransforms.euclidean",
+        ],
+        install_requires=[
+            'numpy>=1.19',
+        ],
         ext_modules=[
             Extension("utils_wrapper", [
-                "transforms/utils/wrapper.cpp",
-                "transforms/utils/base.cpp"
+                "robotransforms/utils/wrapper.cpp",
+                "robotransforms/utils/base.cpp"
             ]),
             Extension("euclidean_wrapper", [
-                "transforms/euclidean/wrapper.cpp",
-                "transforms/euclidean/base.cpp"
+                "robotransforms/euclidean/wrapper.cpp",
+                "robotransforms/euclidean/base.cpp",
             ]),
             Extension("dead_reckon_wrapper", [
-                "transforms/dead_reckon/wrapper.cpp",
-                "transforms/dead_reckon/base.cpp",
-                "transforms/utils/base.cpp",
-                "transforms/euclidean/base.cpp"
+                "robotransforms/dead_reckon/wrapper.cpp",
+                "robotransforms/dead_reckon/base.cpp",
+                "robotransforms/utils/base.cpp",
+                "robotransforms/euclidean/base.cpp",
             ]),
         ]
     )
