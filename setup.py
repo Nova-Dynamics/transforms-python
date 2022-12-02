@@ -1,5 +1,6 @@
 import re
 from setuptools import setup, Extension
+import numpy as np
 
 with open("robotransforms/_version.py") as f:
     exec(f.read())
@@ -31,20 +32,32 @@ def main():
             'numpy>=1.19',
         ],
         ext_modules=[
-            Extension("utils_wrapper", [
-                "robotransforms/utils/wrapper.cpp",
-                "robotransforms/utils/base.cpp"
-            ]),
-            Extension("euclidean_wrapper", [
-                "robotransforms/euclidean/wrapper.cpp",
-                "robotransforms/euclidean/base.cpp",
-            ]),
-            Extension("dead_reckon_wrapper", [
-                "robotransforms/dead_reckon/wrapper.cpp",
-                "robotransforms/dead_reckon/base.cpp",
-                "robotransforms/utils/base.cpp",
-                "robotransforms/euclidean/base.cpp",
-            ]),
+            Extension(
+                "utils_wrapper",
+                [
+                    "robotransforms/utils/wrapper.cpp",
+                    "robotransforms/utils/base.cpp"
+                ],
+                include_dirs=[np.get_include()]
+            ),
+            Extension(
+                "euclidean_wrapper",
+                [
+                    "robotransforms/euclidean/wrapper.cpp",
+                    "robotransforms/euclidean/base.cpp",
+                ],
+                include_dirs=[np.get_include()]
+            ),
+            Extension(
+                "dead_reckon_wrapper",
+                [
+                    "robotransforms/dead_reckon/wrapper.cpp",
+                    "robotransforms/dead_reckon/base.cpp",
+                    "robotransforms/utils/base.cpp",
+                    "robotransforms/euclidean/base.cpp",
+                ],
+                include_dirs=[np.get_include()]
+            ),
         ]
     )
 
