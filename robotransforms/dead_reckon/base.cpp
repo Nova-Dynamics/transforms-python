@@ -72,7 +72,7 @@ namespace dead_reckon {
     }
 
     int dead_reckon_apply(double* step, double *x, double *cov) {
-        if ( step[1] == 0 || step[2] == 0 ) return 1;
+        if ( step[1] == 0 && step[2] == 0 ) return 1;
         // Create extended state vector as state + dl + dr
         double z[ESS] = {
             x[0],
