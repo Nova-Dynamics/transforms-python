@@ -1,8 +1,11 @@
+
 import numpy as np
+import matplotlib.pyplot as plt
+import robotransforms.euclidean as t
 
-from .. import euclidean as t
-# from ..euclidean import pure as t
-
+## ======================
+## CODE
+## ======================
 def DeadReckonStep(timestamp, dl, dr, Dq, vave, vdiff):
     return np.array([ timestamp, dl, dr, Dq[0], Dq[1], Dq[2], Dq[3], vave, vdiff ])
 
@@ -13,34 +16,16 @@ def sinc(x):
     if (np.abs(x) < 1e-4): return 1 - (x*x/6) + (x*x*x*x/120)
     return np.sin(x)/x
 
-DR_D_NOM = 0.464
-DR_LO2G = 0.05
-DR_MU = 0.8
-DR_D_EFF_PARAMS = [0.505225138, 4.55440687, 0.00237199585]
-
-def dr_calculate_d(v_ave,v_diff):
-    _v_diff = v_diff
-    if (np.abs(v_diff) < 1e-8):
-        _v_diff = 1e-8
-
-    return DR_D_NOM \
-        + (DR_D_EFF_PARAMS[0] - DR_D_NOM) \
-            * np.exp( -0.5 * (v_ave / (_v_diff * DR_D_EFF_PARAMS[1]))**2 ) \
-        + DR_D_EFF_PARAMS[2] * np.abs(v_ave)
-
+D = 0.5
 def dead_reckon_step( quat, dl, dr, vave, vdiff ):
     lstar = 0.5 * ( dl + dr )
-    to2 = ( dl - dr ) / ( 2 * dr_calculate_d(vave, vdiff) )
+    to2 = ( dl - dr ) / ( 2 * D )
     chord = lstar * sinc(to2)
     sin = np.sin(to2)
     cos = np.cos(to2)
-    xr = 0
-    if ( np.abs(lstar) > 1e-3 and np.abs(vave) > 1e-6 ):
-        rho = 2 * to2 / lstar
-        xr = DR_LO2G * vave * vave * rho * rho / DR_MU
 
-    dx = chord * ( sin + cos*xr )
-    dy = chord * ( cos - sin*xr )
+    dx = chord * sin
+    dy = chord * cos
 
     return t.apply_quat(t.invert_quat(quat), [dx,dy,0])
 
@@ -61,14 +46,14 @@ def dead_reckon_apply(x_hat, P_hat, step):
         return x_hat, P_hat
 
     # Build up extended state vector
-    SS = 7
+    SS = 3
     z = np.zeros((SS+2))
     z[:SS] = x_hat[:]
     z[SS+0] = step[1]
     z[SS+1] = step[2]
 
     # Build up extended covariance on manifold
-    SM = 6
+    SM = 3
     P_z = np.zeros((SM+2,SM+2))
     P_z[:SM,:SM] = P_hat[:SM,:SM]
     e = dead_reckon_step_errors( step[1], step[2], step[7], step[8] )
@@ -102,11 +87,14 @@ def dead_reckon_apply(x_hat, P_hat, step):
         raise e
 
 
+    lrQ = t.lrq2lrQ([z[0], z[1], 0, 0 ,0, z[2]])
     for i in range(L):
         # The first SS are gotten via composition
-        dlrQ = t.lrq2lrQ(dz[i][:SM])
-        Z[1 + i][:SS] = t.compose_lrQ(z[:SS], dlrQ)
-        Z[1 + i + L][:SS] = t.compose_lrQ(z[:SS], t.invert_lrQ(dlrQ))
+        dlrQ = t.lrq2lrQ([dz[i][0], dz[i][1], 0, 0 ,0, dz[i][2]])
+        lrQ1 = t.compose_lrQ(lrQ, dlrQ)
+        Z[1 + i][:SS] = np.array([lrQ1[0], lrQ1[1], lrQ1[6]])
+        lrQ2 = t.compose_lrQ(lrQ, t.invert_lrQ(dlrQ))
+        Z[1 + i + L][:SS] = np.array([lrQ2[0], lrQ2[1], lrQ2[6]])
 
         # The last 2 are gotten via addition
         Z[1 + i][SS:] = z[SS:] + dz[i][SM:]
@@ -118,12 +106,12 @@ def dead_reckon_apply(x_hat, P_hat, step):
 
     # Transform to new vectors
     def T(_z):
-        quat = _z[3:SS]
+        quat = t.redquat2quat([0 ,0, _z[2]])
         dx = dead_reckon_step( quat=quat, dl=z[SS+0], dr=z[SS+1], vave=step[7], vdiff=step[8] )
         nquat = t.compose_quat(quat,step[3:7])
         # Only return offset, this is marginalizing out all the quat dependances
         # return _z[:3] + dx
-        return np.hstack([_z[:3] + dx, nquat]);
+        return np.hstack([_z[:2] + dx[:2], nquat[3]])
 
     Y = np.array([ T(_z) for _z in Z ])
     print("Y")
@@ -136,11 +124,11 @@ def dead_reckon_apply(x_hat, P_hat, step):
     W0 = LAMBDA / L_PLUS_LAMBDA
     W = 1 / ( 2 * L_PLUS_LAMBDA )
 
-    Y_pos = Y[:,:3]
-    y_pos_bar = (Y_pos[0]*W0 + np.sum(Y_pos[1:]*W,axis=0))[:3]
+    Y_pos = Y[:,:2]
+    y_pos_bar = (Y_pos[0]*W0 + np.sum(Y_pos[1:]*W,axis=0))[:2]
 
     # Iteratively calculate the quaternion mean
-    Y_quat = Y[:,3:]
+    Y_quat = np.array([t.redquat2quat([0,0,d]) for d in Y[:,2]])
     q_bar = Y_quat[0]
     q_bar_inv = t.invert_quat(Y_quat[0])
     EPS = 1e-12
@@ -157,7 +145,7 @@ def dead_reckon_apply(x_hat, P_hat, step):
 
     print(i, error)
 
-    dY = np.hstack([Y_pos-y_pos_bar, e_rquats])
+    dY = np.hstack([Y_pos-y_pos_bar, e_rquats[:,2:]])
     # for row in dY:
     #     print(",".join("{:12.8f}".format(v) for v in row))
     # print()
@@ -171,8 +159,6 @@ def dead_reckon_apply(x_hat, P_hat, step):
 
     x_tilde = T(z)                                       # transform the mean
     P_tilde = cov
-    # P_tilde[3:,:3] = 0
-    # P_tilde[:3,3:] = 0
 
     return x_tilde, P_tilde
 
@@ -181,58 +167,62 @@ def dead_reckon(x_hat, P_hat, steps):
         x_hat, P_hat = dead_reckon_apply(x_hat, P_hat, step)
     return x_hat, P_hat
 
-class DeadReckonQueue():
-    def __init__( self, max_size=100):
-        self.max_size = max_size
-        self.reckon_steps = []
+## ======================
+## test
+## ======================
 
-        self.reset_reference()
+D = 0.464
+dl = 0.08
+dr = 0.07
+to2 = ( dl - dr ) / ( 2 * D )
 
-    def accumulate_to(self, timestamp):
-        if (len(self.reckon_steps) < 1):
-            return False, self.x_hat, self.P
-
-        steps_before_ts = []
-        steps_after_ts = []
-
-        # split the array into "before" and "after"
-        idx = 0
-        for step in self.reckon_steps:
-            if timestamp < step[0]:
-                break
-            idx += 1
-
-        before = self.reckon_steps[:idx]
-        self.reckon_steps = self.reckon_steps[idx:]
-
-        self.x_hat, self.P = dead_reckon(self.x_hat, self.P, before)
-
-        return True, self.x_hat, self.P
-
-    def transform_between(self, start_timestamp, end_timestamp, start_x_hat=np.array([0,0,0, 1,0,0,0]), start_P=np.eye(6)*1e-8):
-        if (len(self.reckon_steps) < 1):
-            return False, None, None
-
-        steps_between_ts = []
-
-        for step in self.reckon_steps:
-            if (step[0] <= end_timestamp and step[0] >= start_timestamp):
-                steps_between_ts.append(step)
- 
-        x_hat = start_x_hat.copy()
-        P = start_P.copy()
-
-        x_hat, P = dead_reckon(x_hat, P, steps_between_ts)
-
-        return True, x_hat, P
+x_hat = np.array([0,0,0])
+P_hat = np.diag([1e-1,1e-1,1e-1])
+step = np.array([
+    43994.76,          # ts
+    dl, dr,      # dl, dr
+    np.cos(to2), 0, 0, -np.sin(to2),    # Dq: a,b,c,d
+    0.215, 0.143,     # vave, vdiff
+])
+steps = 3*[step]
 
 
-    def reset_reference(self):
-        # Full state: x,y,z, a,b,c,d
-        self.x_hat = np.array([0,0,0, 1,0,0,0]) 
-        # Manifold deviation: x,y,z (in terminal coordinates) b,c,d (relative to terminal coordinates)
-        self.P = np.eye(6)*1e-8
+xhs = [x_hat]
+phs = [P_hat]
 
-    def push_step(self, timestamp=0, dl=0, dr=0, Dq=[1,0,0,0], vave=0, vdiff=0):
-        self.reckon_steps.append(DeadReckonStep(timestamp, dl, dr, Dq, vave, vdiff))
-        self.reckon_steps = self.reckon_steps[-self.max_size:]
+for i in range(50):
+    print("==================================== "+str(i+1))
+    x_hat, P_hat = dead_reckon(x_hat, P_hat, steps)
+    xhs.append(x_hat)
+    phs.append(P_hat)
+
+    v,w = np.linalg.eigh(P_hat)
+    print("v")
+    print(",".join("{:12.8f}".format(v) for v in v))
+    print()
+    print("W")
+    for row in w:
+        print(",".join("{:12.8f}".format(v) for v in row))
+    print()
+
+print("x")
+print(",".join("{:12.8f}".format(v) for v in x_hat))
+print()
+print("P")
+for row in P_hat:
+    print(",".join("{:12.8f}".format(v) for v in row))
+print()
+
+
+fig = plt.figure()
+ax = fig.add_subplot(111)
+
+for x,p in zip(xhs, phs):
+    L = np.linalg.cholesky(p)[:2,:2]
+    xy = np.array([L@np.array([np.sin(u), np.cos(u)]) + x[:2] for u in np.linspace(0,2*np.pi,100)])
+    plt.plot(x[:1], x[1:2], "x")
+    plt.plot(xy[:,0], xy[:,1])
+
+
+plt.show()
+
