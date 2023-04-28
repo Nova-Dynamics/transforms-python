@@ -1,13 +1,13 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-import robotransforms.euclidean.euclidean_pure as t
+import robotransforms.euclidean as t
 
 ## ======================
 ## CODE
 ## ======================
-def DeadReckonStep(timestamp, dl, dr, Dq): #, vave, vdiff):
-    return np.array([ timestamp, dl, dr, Dq[0], Dq[1], Dq[2], Dq[3]]) #, vave, vdiff ])
+def DeadReckonStep(timestamp, dl, dr, Dyaw):
+    return np.array([ timestamp, dl, dr, Dyaw ])
 
 L_PLUS_LAMBDA = 3
 
@@ -17,7 +17,7 @@ def sinc(x):
     return np.sin(x)/x
 
 D = 0.5
-def dead_reckon_step( quat, dl, dr): #, vave, vdiff ):
+def dead_reckon_step( yaw, dl, dr ):
     lstar = 0.5 * ( dl + dr )
     to2 = ( dl - dr ) / ( 2 * D )
     chord = lstar * sinc(to2)
@@ -27,15 +27,19 @@ def dead_reckon_step( quat, dl, dr): #, vave, vdiff ):
     dx = chord * sin
     dy = chord * cos
 
-    return t.apply_quat(t.invert_quat(quat), [dx,dy,0])
+    sy, cy = np.sin(yaw), np.cos(yaw)
 
-def dead_reckon_step_errors( dl, dr, dl_scale=0.005): #vave, vdiff, dl_scale=0.005):
+    return np.array([
+         cy*dx + sy*dy,
+        -sy*dx + cy*dy
+    ])
+
+    #return t.apply_quat(t.invert_quat(quat), [dx,dy,0])
+
+def dead_reckon_step_errors( dl, dr, dl_scale=0.005):
     ddl = (dl_scale * np.abs(dl))
     ddr = (dl_scale * np.abs(dr))
-    rho=1-1e-3
-    #rho = 1-1e-8
-    #if ( np.abs(vdiff) >= 1e-3 ) :
-    #    rho = np.abs(np.tanh( vave / vdiff ))
+    rho = 1-1e-3
 
     #  [ var_dl, cov_dldr, var_dr, var_b, var_c, var_d ]
     return [ ddl*ddl + 1e-8, rho*ddl*ddr, ddr*ddr + 1e-8 ] # TODO : these are estimates, based on gps's 1Hz
@@ -57,8 +61,7 @@ def dead_reckon_apply(x_hat, P_hat, step):
     SM = 3
     P_z = np.zeros((SM+2,SM+2))
     P_z[:SM,:SM] = P_hat[:SM,:SM]
-    #                            dl,      dr,      vave,    vdiff
-    e = dead_reckon_step_errors( step[1], step[2]) #, step[7], step[8] )
+    e = dead_reckon_step_errors( step[1], step[2] )
     P_z[0+SM][0+SM] = e[0] # var_dl
     P_z[0+SM][1+SM] = e[1] # cov_dldr
     P_z[1+SM][0+SM] = e[1] # cov_dldr
@@ -88,22 +91,10 @@ def dead_reckon_apply(x_hat, P_hat, step):
         # print(w.T)
         raise e
 
-    #                x_hat y_hat a  b  c  d
-    lrQ = t.lrq2lrQ([z[0], z[1], 0, 0 ,0, z[2]])
-    # Computing sigma points
-    for i in range(L):
-        # The first SS are gotten via composition
-        dlrQ = t.lrq2lrQ([dz[i][0], dz[i][1], 0, 0 ,0, dz[i][2]])
-        lrQ1 = t.compose_lrQ(lrQ, dlrQ)
-        #                         x        y        d
-        Z[1 + i][:SS] = np.array([lrQ1[0], lrQ1[1], lrQ1[6]])
-        dlrQ = t.lrq2lrQ([-dz[i][0], -dz[i][1], 0, 0 ,0, -dz[i][2]])
-        lrQ2 = t.compose_lrQ(lrQ, dlrQ)
-        Z[1 + i + L][:SS] = np.array([lrQ2[0], lrQ2[1], lrQ2[6]])
 
-        # The last 2 (dl, dr) are gotten via addition
-        Z[1 + i][SS:] = z[SS:] + dz[i][SM:]
-        Z[1 + i + L][SS:] = z[SS:] - dz[i][SM:]
+    for i in range(L):
+        Z[1 + i] = z + dz[i]
+        Z[1 + i + L] = z - dz[i]
     print("Z")
     for row in Z:
         print(",".join("{:12.8f}".format(v) for v in row))
@@ -111,14 +102,10 @@ def dead_reckon_apply(x_hat, P_hat, step):
 
     # Transform to new vectors
     def T(_z):
-        #                      b  c  d
-        quat = t.redquat2quat([0 ,0, _z[2]])
-        dx = dead_reckon_step( quat=quat, dl=z[SS+0], dr=z[SS+1]) #, vave=step[7], vdiff=step[8] )
-        # Taking current quat and applying step quat rotation to it
-        next_quat = t.compose_quat(quat,step[3:7])
+        dx = dead_reckon_step( yaw=_z[2], dl=z[SS+0], dr=z[SS+1] )
         # Only return offset, this is marginalizing out all the quat dependances
         # return _z[:3] + dx
-        return np.hstack([_z[:2] + dx[:2], next_quat[3]])
+        return np.hstack([_z[:2] + dx[:2], _z[2] + step[3]])
 
     Y = np.array([ T(_z) for _z in Z ])
     #plt.plot(Z[:,0],Z[:,1],"go")
@@ -134,34 +121,8 @@ def dead_reckon_apply(x_hat, P_hat, step):
     W0 = LAMBDA / L_PLUS_LAMBDA
     W = 1 / ( 2 * L_PLUS_LAMBDA )
 
-    # Grab x and y in every sigma point
-    Y_pos = Y[:,:2]
-
-    # Take a weighted average of the position components
-    y_pos_bar = (Y_pos[0]*W0 + np.sum(Y_pos[1:]*W,axis=0))[:2]
-
-    # Iteratively calculate the quaternion mean
-    Y_quat = np.array([t.redquat2quat([0,0,d]) for d in Y[:,2]])
-    q_bar = Y_quat[0]
-    q_bar_inv = t.invert_quat(Y_quat[0])
-    EPS = 1e-12
-    MAX = 100
-    i = 0
-    error = 1
-    while ( i < MAX and error > EPS ):
-        i += 1
-        e_rquats = np.array([t.quat2redquat(t.compose_quat(q_bar_inv, y)) for y in Y_quat])
-        e = (e_rquats[0]*W0 + np.sum(e_rquats[1:]*W,axis=0))
-        error = np.linalg.norm(e)
-        q_bar = t.compose_quat(q_bar, t.redquat2quat(e))
-        q_bar_inv = t.invert_quat(q_bar)
-
-    print(i, error)
-
-    dY = np.hstack([Y_pos-y_pos_bar, e_rquats[:,2:]])
-    # for row in dY:
-    #     print(",".join("{:12.8f}".format(v) for v in row))
-    # print()
+    y_bar = (Y[0]*W0 + np.sum(Y[1:]*W,axis=0))
+    dY = Y - y_bar
     print("dY")
     for row in dY:
         print(",".join("{:12.8f}".format(v) for v in row))
@@ -181,21 +142,21 @@ def dead_reckon(x_hat, P_hat, steps):
     return x_hat, P_hat
 
 ## ======================
-## TEST
+## test
 ## ======================
 
 D = 0.464
 dl = 0.08
 dr = 0.07
 to2 = ( dl - dr ) / ( 2 * D )
+yaw = to2*2
 
 x_hat = np.array([0,0,0])
-P_hat = np.diag([1e-1,1e-1,0.05])
+P_hat = np.diag([1e-1,1e-1,0.2])
 step = np.array([
     43994.76,          # ts
     dl, dr,      # dl, dr
-    np.cos(to2), 0, 0, -np.sin(to2),    # Dq: a,b,c,d
-    #0.215, 0.143,     # vave, vdiff
+    yaw
 ])
 steps = 3*[step]
 

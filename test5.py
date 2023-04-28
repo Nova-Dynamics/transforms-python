@@ -34,7 +34,7 @@ def dead_reckon_step( yaw, dl, dr ):
         -sy*dx + cy*dy
     ])
 
-    return t.apply_quat(t.invert_quat(quat), [dx,dy,0])
+    #return t.apply_quat(t.invert_quat(quat), [dx,dy,0])
 
 def dead_reckon_step_errors( dl, dr, dl_scale=0.005):
     ddl = (dl_scale * np.abs(dl))
@@ -108,6 +108,9 @@ def dead_reckon_apply(x_hat, P_hat, step):
         return np.hstack([_z[:2] + dx[:2], _z[2] + step[3]])
 
     Y = np.array([ T(_z) for _z in Z ])
+    plt.plot(Z[:,0],Z[:,1],"go")
+    plt.plot(Y[:,0],Y[:,1],"bx")
+    plt.show()
     print("Y")
     for row in Y:
         print(",".join("{:12.8f}".format(v) for v in row))

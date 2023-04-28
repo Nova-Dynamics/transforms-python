@@ -132,6 +132,14 @@ def apply_quat(q,v):
         q[0]*c - q[2]*a - q[3]*b + q[1]*d,
         q[0]*d - q[3]*a - q[1]*c + q[2]*b
     ])
+    #print(q[0])
+    #Q_tx = np.array([
+    #    [q[0]**2+q[1]**2-q[2]**2-q[3]**2, 2*q[1]*q[2]-2*q[0]*q[3], 2*q[1]*q[3]+2*q[0]*q[2]],
+    #    [2*q[1]*q[2]+2*q[0]*q[3], q[0]**2-q[1]**2+q[2]**2-q[3]**2, 2*q[2]*q[3]-2*q[0]*q[1]],
+    #    [2*q[1]*q[3]-2*q[0]*q[2], 2*q[2]*q[3]+2*q[0]*q[1], q[0]**2-q[1]**2-q[2]**2+q[3]**2]
+    #])
+    #v_arr = np.array(v)
+    #return np.squeeze(Q_tx@v_arr.reshape(v_arr.shape[0],1))
 
 def apply_euler(euler,v):
     return apply_quat(euler2quat(euler), v)
@@ -173,7 +181,7 @@ def invert_quat(q):
         -q[2],
         -q[3],
     ])
-    return redquat2quat(-quat2redquat(q))
+    #return redquat2quat(-quat2redquat(q))
 
 def invert_euler(euler):
     return quat2euler(invert_quat(euler2quat(euler)))
