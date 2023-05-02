@@ -44,7 +44,7 @@ def dead_reckon_step_errors( dl, dr, dl_scale=0.005):
     #  [ var_dl, cov_dldr, var_dr, var_b, var_c, var_d ]
     return [ ddl*ddl + 1e-8, rho*ddl*ddr, ddr*ddr + 1e-8 ] # TODO : these are estimates, based on gps's 1Hz
 
-def dead_reckon_apply(x_hat, P_hat, step):
+def dead_reckon_apply(x_hat, P_hat, step, idx):
 
     # No-op if we didn't move
     if (step[1] == 0 and step[2] == 0):
@@ -131,14 +131,39 @@ def dead_reckon_apply(x_hat, P_hat, step):
     for k in range(1,len(dY)):
         cov = cov + W * np.array([dY[k]]).T @ np.array([dY[k]]) # exterior product
 
+    print("cov")
+    for row in cov:
+        print(",".join("{:12.8f}".format(v) for v in row))
+    print()
     x_tilde = T(z)                                       # transform the mean
     P_tilde = cov
 
+    for zz in Z:
+        euler = [-zz[2], 0, 0]
+        xyz = np.array([ t.apply_euler(euler, _xyz) for _xyz in [
+            [0,0.05,0],
+            [-0.01,0,0],
+            [0.01,0,0],
+            [0,0.05,0]
+        ]]) + np.array([zz[0],zz[1],0])
+        plt.fill(xyz[:,0],xyz[:,1],color="green", alpha=0.5)
+    for zz in Y:
+        euler = [-zz[2], 0, 0]
+        xyz = np.array([ t.apply_euler(euler, _xyz) for _xyz in [
+            [0,0.05,0],
+            [-0.01,0,0],
+            [0.01,0,0],
+            [0,0.05,0]
+        ]]) + np.array([zz[0],zz[1],0])
+        plt.fill(xyz[:,0],xyz[:,1],color="blue", alpha=0.5)
+    #if idx > 10:
+    #    plt.show()
+
     return x_tilde, P_tilde
 
-def dead_reckon(x_hat, P_hat, steps):
+def dead_reckon(x_hat, P_hat, steps, i):
     for step in steps:
-        x_hat, P_hat = dead_reckon_apply(x_hat, P_hat, step)
+        x_hat, P_hat = dead_reckon_apply(x_hat, P_hat, step, i)
     return x_hat, P_hat
 
 ## ======================
@@ -166,7 +191,7 @@ phs = [P_hat]
 
 for i in range(50):
     print("==================================== "+str(i+1))
-    x_hat, P_hat = dead_reckon(x_hat, P_hat, steps)
+    x_hat, P_hat = dead_reckon(x_hat, P_hat, steps, i)
     xhs.append(x_hat)
     phs.append(P_hat)
 
