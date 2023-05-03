@@ -75,13 +75,13 @@ namespace dead_reckon {
         if ( step[1] == 0 && step[2] == 0 ) return 1;
         // Create extended state vector as state + dl + dr
         double z[ESS] = {
-            x[0],
-            x[1],
-            x[2],
-            x[3],
-            x[4],
-            x[5],
-            x[6],
+            x[0],    // x
+            x[1],    // y
+            x[2],    // z
+            x[3],    // a
+            x[4],    // b
+            x[5],    // c
+            x[6],    // d
             step[1], // dl
             step[2], // dr
         };
@@ -117,17 +117,19 @@ namespace dead_reckon {
         // Attempt to square-root the scaled covariance
         double R[L*L];
         if ( !utils::cholesky( L, L_PLUS_LAMBDA, P_z, R ) ) return 0;
-        
+
         for ( int i = 0; i < L; i ++ ) {
             // Extract and lrQ from the ith row of the root covariance (which is a manifold deviation)
-            double dlrQ[7], idlrQ[7];
-            euclidean::convert_lrq_to_lrQ(&R[i*L], dlrQ);
-            euclidean::invert_lrQ(dlrQ, idlrQ);
+            double dlrQ1[SS], dlrQ2[SS], R_neg_row[SM];
+            for ( int j = 0; j < SM; j++ ) {
+                R_neg_row[j] = -R[i*L + j];
+            }
+            euclidean::convert_lrrv_to_lrQ(&R[i*L], dlrQ1);
+            euclidean::convert_lrrv_to_lrQ(R_neg_row, dlrQ2);
 
             // Write into the the sigma point the difference
-            euclidean::compose_lrQ(z, dlrQ,  &Z[(i+1)*n]);
-            euclidean::compose_lrQ(z, idlrQ, &Z[(i+L+1)*n]);
-
+            euclidean::compose_lrQ(z, dlrQ1,  &Z[(i+1)*n]);
+            euclidean::compose_lrQ(z, dlrQ2, &Z[(i+L+1)*n]);
 
             // Also add in the last two elements
             Z[(i+1)*n + SS + 0] = z[SS + 0] + R[i*L + SM + 0];
@@ -137,7 +139,7 @@ namespace dead_reckon {
         }
 
         // Transform the sigma points
-        double Y[(2*L+1)*3];
+        double Y[(2*L+1)*SS];
         for ( int i = 0; i < 2*L+1; i ++ ) {
             dead_reckon_step(
                 &Z[i*n + 3], //quat
@@ -145,42 +147,79 @@ namespace dead_reckon {
                 z[SS + 1],   // dr
                 step[7],     // vave
                 step[8],     // vave
-                &Y[i*3]
+                &Y[i*SS]     // delta change
             );
             for ( int j = 0; j < 3; j ++ ) {
-                Y[i*3 + j] += Z[i*n + j];
+                Y[i*SS + j] += Z[i*n + j]; // add initial value
+            }
+            // Write over the quaternion part with the new quaterion estimate
+            euclidean::compose_quat(&Z[i*n + 3], &step[3], &Y[i*SS + 3]);
+        }
+
+        // Iteratively calculate the lrQ mean
+        // Copy Y[0] as my initial guess for y_bar
+        double y_bar[SS];
+        for ( int i = 0; i < SS; i++ ) {
+            y_bar[i] = Y[i];
+        }
+        double EPS = 1e-20;
+        int MAX = 100;
+        int i = 0;
+        double LAMBDA = 3. - L;
+        double W0 = LAMBDA / 3.;
+        double W = 1. / ( 2. * 3. );
+        double sq_error = 1.;
+        double y_bar_inv[SS];
+        double dY[(2*L+1)*SM];
+        double dlrQ[SS];
+        while ( i < MAX && sq_error > EPS ) {
+            i += 1;
+            euclidean::invert_lrQ(y_bar, y_bar_inv);
+            for ( int i = 0; i < 2*L+1; i ++ ) {
+                euclidean::compose_lrQ(y_bar_inv, &Y[i*SS], dlrQ);
+                euclidean::convert_lrQ_to_lrrv(dlrQ, &dY[i*SM]);
+            }
+
+            double e[SM];
+            for ( int i = 0; i < SM; i ++ ) {
+                e[i] = dY[i]*W0;
+            }
+            for ( int j = 1; j < 2*L+1; j ++ ) {
+                for ( int i = 0; i < SM; i ++ ) {
+                    e[i] += dY[j*SM + i]*W;
+                }
+            }
+
+            sq_error = 0;
+            for ( int i = 0; i < SM; i ++ ) {
+                sq_error += e[i]*e[i];
+            }
+
+            euclidean::convert_lrrv_to_lrQ(e, dlrQ);
+            euclidean::compose_lrQ(y_bar, dlrQ, y_bar_inv);
+            for ( int i = 0; i < SS; i ++ ) {
+                y_bar[i] = y_bar_inv[i];
             }
         }
 
-        // Note, this probably only works becuase we have neglected the quat -- not sure how to average on the manifold....
-        double y[3], y_cov[3*3];
-        utils::GRV_statistics(3, L, Y, y, y_cov);
-
-
-        // Update state and covarience
-        x[0] = Y[0]; // use mean transform
-        x[1] = Y[1]; // use mean transform
-        x[2] = Y[2]; // use mean transform
-        double quat[4];
-        euclidean::compose_quat(&x[3], &step[3], quat); // accumulate difference along manifold
-        x[3] = quat[0];
-        x[4] = quat[1];
-        x[5] = quat[2];
-        x[6] = quat[3];
-
-        for ( int i = 0; i < 3; i ++ ) {
-            for ( int j = 0; j < 3; j ++ ) {
-                cov[i*SM + j] = y_cov[i*3 + j];
+        // Update the covariance
+        int k = 0;
+        for ( int i = 0; i < SM; i ++ ) {
+            for ( int j = 0; j < SM; j ++ ) {
+                cov[i*SM + j] = W0 * dY[k*SM + i] * dY[k*SM + j];
             }
         }
-        for ( int i = 0; i < 3; i ++ ) {
-            for ( int j = 3; j < SM; j ++ ) {
-                cov[i*SM + j] = 0;
-                cov[j*SM + i] = 0;
+        for ( k = 1; k < 2*L+1; k ++ ) {
+            for ( int i = 0; i < SM; i ++ ) {
+                for ( int j = 0; j < SM; j ++ ) {
+                    cov[i*SM + j] += W * dY[k*SM + i] * dY[k*SM + j];
+                }
             }
         }
-        for ( int i = 3; i < SM; i ++ ) {
-            cov[i*SM + i] = 1e-5; // TODO : this is a rough estimate of IMU's accuracy
+
+        // Update mean as transform of mean
+        for ( int i = 0; i < SS; i++ ) {
+            x[i] = Y[i];
         }
 
         return 1;

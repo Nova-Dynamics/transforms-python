@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 from .. import euclidean as t
 # from ..euclidean import pure as t
@@ -81,6 +82,7 @@ def dead_reckon_apply(x_hat, P_hat, step):
     L = SM+2
     Z = np.zeros((2*L+1,SS+2))
     Z[0] = z.copy()
+
     scaled_cov = P_z * L_PLUS_LAMBDA
     # Rows of the R matrix in A=R^TR function like a square root
     try:
@@ -100,41 +102,54 @@ def dead_reckon_apply(x_hat, P_hat, step):
         # print(v)
         # print(w.T)
         raise e
-    for i in range(L):
-        # The first SS are gotten via composition
-        dlrQ = t.lrq2lrQ(dz[i][:SM])
-        Z[1 + i][:SS] = t.compose_lrQ(z[:SS], dlrQ)
-        Z[1 + i + L][:SS] = t.compose_lrQ(z[:SS], t.invert_lrQ(dlrQ))
 
-        # The last 2 are gotten via addition
-        Z[1 + i][SS:] = z[SS:] + dz[i][SM:]
-        Z[1 + i + L][SS:] = z[SS:] - dz[i][SM:]
+
+    # extract the mean lrQ part
+    lrQ = z[:SS]
+    for i in range(L):
+        Z[1 + i][:SS] = t.compose_lrQ(lrQ, t.lrrv2lrQ(dz[i,:SM]))
+        Z[1 + i][-2:] = Z[0,-2:] + dz[i,-2:]
+
+        Z[1 + i + L][:SS] = t.compose_lrQ(lrQ, t.lrrv2lrQ(-dz[i,:SM]))
+        Z[1 + i + L][-2:] = Z[0,-2:] - dz[i,-2:]
 
     # Transform to new vectors
     def T(_z):
         quat = _z[3:SS]
-        dx = dead_reckon_step( quat=_z[3:SS], dl=z[SS+0], dr=z[SS+1], vave=step[7], vdiff=step[8] )
-        # Only return offset, this is marginalizing out all the quat dependances
-        return _z[:3] + dx
+        dx = dead_reckon_step( quat=quat, dl=z[SS+0], dr=z[SS+1], vave=step[7], vdiff=step[8] )
+        nquat = t.compose_quat(quat,step[3:7])
+        return np.hstack([_z[:3] + dx, nquat]);
 
     Y = np.array([ T(_z) for _z in Z ])
 
-    M = len(Y[0])
     LAMBDA = L_PLUS_LAMBDA - L
     W0 = LAMBDA / L_PLUS_LAMBDA
     W = 1 / ( 2 * L_PLUS_LAMBDA )
 
-    y_bar = Y[0]*W0 + np.sum(Y[1:]*W,axis=0) # Note, this probably only works becuase we have neglected the quat -- not sure how to average on the manifold....
-    dY = Y - y_bar
+    ## Iteratively calculate the quaternion mean
+    y_bar = Y[0]
+    EPS = 1e-10
+    MAX = 100
+    i = 0
+    error = 1
+    while ( i < MAX and error > EPS ):
+        i += 1
+        y_bar_inv = t.invert_lrQ(y_bar)
+        dY = np.array([t.lrQ2lrrv(t.compose_lrQ(y_bar_inv, y)) for y in Y])
+        e = (dY[0]*W0 + np.sum(dY[1:]*W,axis=0))
+        error = np.linalg.norm(e) # TODO : should this be normalized?
+        y_bar = t.compose_lrQ(y_bar, t.lrrv2lrQ(e))
+
+
     cov = W0 * np.array([dY[0]]).T @ np.array([dY[0]]) # exterior product
     for k in range(1,len(dY)):
         cov = cov + W * np.array([dY[k]]).T @ np.array([dY[k]]) # exterior product
 
-    x_tilde = np.zeros(7)
-    x_tilde[:3] = T(z)                                                   # transform the mean
-    x_tilde[3:] = t.compose_quat(x_hat[3:],step[3:7])                    # accumulate the new difference along the manifold
-    P_tilde = np.eye(6)*1e-5                                             # Set imu variance value
-    P_tilde[:3,:3] = cov                                                 # write in deviation for translation
+
+
+    x_tilde = T(z)                                       # transform the mean
+    # x_tilde = np.hstack([y_pos_bar, q_bar])              # mean of transform
+    P_tilde = cov
 
     return x_tilde, P_tilde
 
@@ -180,7 +195,7 @@ class DeadReckonQueue():
         for step in self.reckon_steps:
             if (step[0] <= end_timestamp and step[0] >= start_timestamp):
                 steps_between_ts.append(step)
- 
+
         x_hat = start_x_hat.copy()
         P = start_P.copy()
 
@@ -191,7 +206,7 @@ class DeadReckonQueue():
 
     def reset_reference(self):
         # Full state: x,y,z, a,b,c,d
-        self.x_hat = np.array([0,0,0, 1,0,0,0]) 
+        self.x_hat = np.array([0,0,0, 1,0,0,0])
         # Manifold deviation: x,y,z (in terminal coordinates) b,c,d (relative to terminal coordinates)
         self.P = np.eye(6)*1e-8
 

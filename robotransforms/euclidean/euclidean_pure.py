@@ -9,6 +9,7 @@ Types:
     euler   - [ yaw, pitch, roll ]
     quat    - [ re, i, j, k ]
     redquat - [ i, j, k ] (where re is assumed positive)
+    rotvec -  [ e1, e2, e3 ] = 2*arcsin(|[i,j,k]|)* hat([i,j,k])
     rotmat  - 3x3
     homo    - 4x4
     srq     - [ x, y, z, i, j, k]
@@ -16,6 +17,7 @@ Types:
     lrq     - [ x, y, z, i, j, k ]
     lre     - [ x, y, z, yaw, pitch, roll ]
     lrQ     - [ x, y, z, re, i, j, k ]
+    lrrv    - [ x, y, z, e1, e2, e3 ]
 """
 import numpy as np
 
@@ -109,8 +111,83 @@ def rotmat2quat(R):
         d *= -1 if (R[2,0] + R[0,2] < 0) else 1
     elif c > 1e-12:
         d *= -1 if (R[1,2] + R[2,1] < 0) else 1
-    
+
     return np.array([np.sqrt(np.clip(asq,0,1)),b,c,d])
+
+# https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6339217/pdf/sensors-19-00149.pdfh
+def quat2rotvec(quat):
+    if np.allclose(quat, np.array([1., 0., 0., 0.])):
+        return np.array([0., 0., 0.])
+
+    rotvec = np.zeros(3)
+    qvec_norm = np.linalg.norm(quat[1:])
+    if quat[0] >= 0:
+        rotvec = 2 * np.arcsin(qvec_norm) * quat[1:] / qvec_norm
+    else:
+        # Needs to switch the sign of the imaginary, since this expects real positive.
+        #  recall that -q and q are the same rotation, so by mapping q -> -q we get
+        #  a positive real part, so our formula works
+        rotvec = 2 * np.arcsin(qvec_norm) * -quat[1:] / qvec_norm
+
+    return rotvec
+
+# # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6339217/pdf/sensors-19-00149.pdfh
+# def quat2rotvec(q):
+#     sign = 1;
+#     if ( q[0] < 0 ): sign = -1
+#
+#     im_norm = np.sqrt(np.clip(
+#         q[1]*q[1] + q[2]*q[2] + q[3]*q[3]
+#     , 0., 1.))
+#
+#     rq = np.zeros(3)
+#     if ( im_norm == 0. ):
+#         rq[0] = sign*0.;
+#         rq[1] = sign*0.;
+#         rq[2] = sign*0.;
+#     else:
+#         asin_times_2_over_norm = 2 * sign * np.arcsin(im_norm) / im_norm;
+#         rq[0] = asin_times_2_over_norm * q[1];
+#         rq[1] = asin_times_2_over_norm * q[2];
+#         rq[2] = asin_times_2_over_norm * q[3];
+#
+#     return rq
+
+# https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6339217/pdf/sensors-19-00149.pdfh
+def rotvec2quat(rotvec):
+    if np.allclose(rotvec, np.zeros_like(rotvec)):
+        return np.array([1., 0., 0., 0.])
+
+    rotvec_norm = np.linalg.norm(rotvec)
+    quat = np.zeros(4)
+    quat[0] = np.cos(rotvec_norm / 2)
+    quat[1:] = np.sin(rotvec_norm / 2) * rotvec / rotvec_norm
+
+    return quat
+
+
+# # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6339217/pdf/sensors-19-00149.pdfh
+# def rotvec2quat(rq):
+#     norm = np.sqrt(np.max([
+#         rq[0]*rq[0] + rq[1]*rq[1] + rq[2]*rq[2],
+#         0.
+#     ]));
+#
+#     q = np.zeros(4)
+#     if ( norm == 0. ):
+#         q[0] = 1.;
+#         q[1] = 0.;
+#         q[2] = 0.;
+#         q[3] = 0.;
+#     else:
+#         half_norm = norm / 2.0;
+#         sin_over_norm = np.sin(half_norm) / norm;
+#         q[0] = np.cos(half_norm);
+#         q[1] = rq[0] * sin_over_norm;
+#         q[2] = rq[1] * sin_over_norm;
+#         q[3] = rq[2] * sin_over_norm;
+#
+#     return q
 
 # ------------------------------------------
 #  Applications
@@ -121,6 +198,9 @@ def apply_rotmat(R,v):
 
 def apply_redquat(rq,v):
     return apply_quat(redquat2quat(rq),v)
+
+def apply_rotvec(rv,v):
+    return apply_quat(rotvec2quat(rq),v)
 
 def apply_quat(q,v):
     a =             - v[0]*q[1] - v[1]*q[2] - v[2]*q[3]
@@ -155,6 +235,9 @@ def apply_lre(lre,v):
 def apply_lrQ(lrQ,v):
     return apply_quat(lrQ[3:], v - lrQ[:3])
 
+def apply_lrrv(lrrv,v):
+    return apply_quat(rotvec2quat(lrrv[3:]), v - lrrv[:3])
+
 
 # -------------
 #  Inversions
@@ -166,6 +249,9 @@ def invert_rotmat(R):
 def invert_redquat(rq):
     return -rq
 
+def invert_rotvec(rv):
+    return -rv
+
 def invert_quat(q):
     return np.array([
         q[0],
@@ -173,7 +259,7 @@ def invert_quat(q):
         -q[2],
         -q[3],
     ])
-    return redquat2quat(-quat2redquat(q))
+    #return redquat2quat(-quat2redquat(q))
 
 def invert_euler(euler):
     return quat2euler(invert_quat(euler2quat(euler)))
@@ -216,6 +302,19 @@ def invert_lrQ(lrQ):
         rinv[1],
         rinv[2],
         rinv[3],
+    ])
+
+
+def invert_lrrv(lrrv):
+    rinv = invert_rotvec(lrrv[3:])
+    location = -apply_rotvec(lrrv[3:], lrrv[:3])
+    return np.array([
+        location[0],
+        location[1],
+        location[2],
+        rinv[0],
+        rinv[1],
+        rinv[2],
     ])
 
 def invert_sre(sre):
@@ -370,6 +469,30 @@ def lrQ2lrq(lrQ):
         rq[2],
     ])
 
+def lrrv2lrQ(lrrv):
+    q = rotvec2quat(lrrv[3:])
+
+    return np.array([
+        lrq[0],
+        lrq[1],
+        lrq[2],
+        q[0],
+        q[1],
+        q[2],
+        q[3]
+    ])
+
+def lrQ2lrrv(lrQ):
+    rq = quat2rotvec(lrQ[3:])
+
+    return np.array([
+        lrQ[0],
+        lrQ[1],
+        lrQ[2],
+        rq[0],
+        rq[1],
+        rq[2],
+    ])
 
 def lre2lrQ(lre):
     q = euler2quat(lre[3:])
@@ -406,6 +529,9 @@ def compose_rotmat(R1,R2):
 def compose_redquat(rq1,rq2):
     return quat2redquat(compose_quat(redquat2quat(rq1),redquat2quat(rq2)))
 
+def compose_rotvec(rv1,rv2):
+    return quat2rotvec(compose_quat(rotvec2quat(rv1),rotvec2quat(rv2)))
+
 def compose_quat(q1,q2):
     return np.array([
         q1[0]*q2[0] - q1[1]*q2[1] - q1[2]*q2[2] - q1[3]*q2[3],
@@ -441,6 +567,20 @@ def compose_lrq(lrq1, lrq2):
         rq3[0],
         rq3[1],
         rq3[2],
+    ])
+
+
+def compose_lrrv(lrrv1, lrrv2):
+    rv1 = lrrv1[3:]
+    rv3 = compose_rotvec(rv1, lrv2[3:])
+    location3 = lrv1[:3] + apply_rotvec(invert_rotvec(rv1), lrv2[:3])
+    return np.array([
+        location3[0],
+        location3[1],
+        location3[2],
+        rv3[0],
+        rv3[1],
+        rv3[2],
     ])
 
 def compose_lrQ(lrQ1, lrQ2):

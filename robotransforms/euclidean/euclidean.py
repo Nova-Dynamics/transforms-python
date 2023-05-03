@@ -9,6 +9,7 @@ Types:
     euler   - [ yaw, pitch, roll ]
     quat    - [ re, i, j, k ]
     redquat - [ i, j, k ] (where re is assumed positive)
+    rotvec -  [ e1, e2, e3 ] = 2*arcsin(|[i,j,k]|)* hat([i,j,k])
     rotmat  - 3x3
     homo    - 4x4
     srq     - [ x, y, z, i, j, k]
@@ -16,6 +17,7 @@ Types:
     lrq     - [ x, y, z, i, j, k ]
     lre     - [ x, y, z, yaw, pitch, roll ]
     lrQ     - [ x, y, z, re, i, j, k ]
+    lrrv    - [ x, y, z, e1, e2, e3 ]
 """
 import numpy as np
 
@@ -34,17 +36,41 @@ def convert_redquat_to_quat(a):
     return out
 redquat2quat = convert_redquat_to_quat
 
+def convert_quat_to_rotvec(a):
+    out = np.zeros(3)
+    wrap.convert_quat_to_rotvec(a,out)
+    return out
+quat2rotvec = convert_quat_to_rotvec
+
+def convert_rotvec_to_quat(a):
+    out = np.zeros(4)
+    wrap.convert_rotvec_to_quat(a,out)
+    return out
+rotvec2quat = convert_rotvec_to_quat
+
 def convert_lrq_to_lrQ(a):
     out = np.zeros(7)
     wrap.convert_lrq_to_lrQ(a,out)
     return out
 lrq2lrQ = convert_lrq_to_lrQ
 
+def convert_lrrv_to_lrQ(a):
+    out = np.zeros(7)
+    wrap.convert_lrrv_to_lrQ(a,out)
+    return out
+lrrv2lrQ = convert_lrrv_to_lrQ
+
 def convert_lrQ_to_lrq(a):
     out = np.zeros(6)
     wrap.convert_lrQ_to_lrq(a,out)
     return out
 lrQ2lrq = convert_lrQ_to_lrq
+
+def convert_lrQ_to_lrrv(a):
+    out = np.zeros(6)
+    wrap.convert_lrQ_to_lrrv(a,out)
+    return out
+lrQ2lrrv = convert_lrQ_to_lrrv
 
 def apply_quat(a,b):
     out = np.zeros(3)
@@ -54,6 +80,11 @@ def apply_quat(a,b):
 def apply_redquat(a,b):
     out = np.zeros(3)
     wrap.apply_redquat(a,b,out)
+    return out
+
+def apply_rotvec(a,b):
+    out = np.zeros(3)
+    wrap.apply_rotvec(a,b,out)
     return out
 
 def apply_lrQ(a,b):
@@ -66,6 +97,11 @@ def apply_lrq(a,b):
     wrap.apply_lrq(a,b,out)
     return out
 
+def apply_lrrv(a,b):
+    out = np.zeros(3)
+    wrap.apply_lrrv(a,b,out)
+    return out
+
 def invert_quat(a):
     out = np.zeros(4)
     wrap.invert_quat(a,out)
@@ -74,6 +110,11 @@ def invert_quat(a):
 def invert_redquat(a):
     out = np.zeros(3)
     wrap.invert_redquat(a,out)
+    return out
+
+def invert_rotvec(a):
+    out = np.zeros(3)
+    wrap.invert_rotvec(a,out)
     return out
 
 def invert_lrQ(a):
@@ -86,6 +127,11 @@ def invert_lrq(a):
     wrap.invert_lrq(a,out)
     return out
 
+def invert_lrrv(a):
+    out = np.zeros(6)
+    wrap.invert_lrrv(a,out)
+    return out
+
 def compose_quat(a,b):
     out = np.zeros(4)
     wrap.compose_quat(a,b,out)
@@ -96,6 +142,11 @@ def compose_redquat(a,b):
     wrap.compose_redquat(a,b,out)
     return out
 
+def compose_rotvec(a,b):
+    out = np.zeros(3)
+    wrap.compose_rotvec(a,b,out)
+    return out
+
 def compose_lrQ(a,b):
     out = np.zeros(7)
     wrap.compose_lrQ(a,b,out)
@@ -104,6 +155,11 @@ def compose_lrQ(a,b):
 def compose_lrq(a,b):
     out = np.zeros(6)
     wrap.compose_lrq(a,b,out)
+    return out
+
+def compose_lrrv(a,b):
+    out = np.zeros(6)
+    wrap.compose_lrrv(a,b,out)
     return out
 
 # Keep all the "slow" functions, until we get around to wrapping them too
