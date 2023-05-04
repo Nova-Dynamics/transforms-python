@@ -473,9 +473,9 @@ def lrrv2lrQ(lrrv):
     q = rotvec2quat(lrrv[3:])
 
     return np.array([
-        lrq[0],
-        lrq[1],
-        lrq[2],
+        lrrv[0],
+        lrrv[1],
+        lrrv[2],
         q[0],
         q[1],
         q[2],
