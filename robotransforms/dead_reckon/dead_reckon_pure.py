@@ -55,20 +55,28 @@ def dead_reckon_step_errors( dl, dr, vave, vdiff, dl_scale=0.005):
     return [ ddl*ddl + 1e-8, rho*ddl*ddr, ddr*ddr + 1e-8 ] # TODO : these are estimates, based on gps's 1Hz
 
 def dead_reckon_apply(x_hat, P_hat, step):
+    SS = 7 # Full state size
+    SM = 6 # Manifold state size
 
-    # No-op if we didn't move
     if (step[1] == 0 and step[2] == 0):
-        return x_hat, P_hat
+        # If the tracks didn't move, then just update the quaternion-part. There are two reasons dl=dr=0:
+        #   1) The tracks didn't quite accrue a tick. In this case, the quaternion part might still have a
+        #      bit of rotation, that we don't want to loose. However, the error accrual is SUPER small, and
+        #      this should only happen 'infrequently' so the loss of error is probably negilible. Fun fact,
+        #      since the tick is gross, it turns out droping the quaternion correction builds up, so you loose
+        #      something like 20degs over a 180deg turn. Wild, dude.
+        #   2) The tracks really haven't been moving. In this case, the IMU is probably not moving either --
+        #      except for drift (which we are handling elsewhere in the KF), so we are fine to just accrue
+        #      the IMU corrections.
+        return np.hstack([x_hat[:3], t.compose_quat(x_hat[3:SS], step[3:SS])]), P_hat.copy()
 
     # Build up extended state vector
-    SS = 7
     z = np.zeros((SS+2))
     z[:SS] = x_hat[:]
     z[SS+0] = step[1]
     z[SS+1] = step[2]
 
     # Build up extended covariance on manifold
-    SM = 6
     P_z = np.zeros((SM+2,SM+2))
     P_z[:SM,:SM] = P_hat[:SM,:SM]
     e = dead_reckon_step_errors( step[1], step[2], step[7], step[8] )

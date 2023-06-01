@@ -72,7 +72,22 @@ namespace dead_reckon {
     }
 
     int dead_reckon_apply(double* step, double *x, double *cov) {
-        if ( step[1] == 0 && step[2] == 0 ) return 1;
+        if ( step[1] == 0 && step[2] == 0 ) {
+            // If the tracks didn't move, then just update the quaternion-part. There are two reasons dl=dr=0:
+            //   1) The tracks didn't quite accrue a tick. In this case, the quaternion part might still have a
+            //      bit of rotation, that we don't want to loose. However, the error accrual is SUPER small, and
+            //      this should only happen 'infrequently' so the loss of error is probably negilible. Fun fact,
+            //      since the tick is gross, it turns out droping the quaternion correction builds up, so you loose
+            //      something like 20degs over a 180deg turn. Wild, dude.
+            //   2) The tracks really haven't been moving. In this case, the IMU is probably not moving either --
+            //      except for drift (which we are handling elsewhere in the KF), so we are fine to just accrue
+            //      the IMU corrections.
+            // Write over the quaternion part with the new quaterion estimate
+            double quat[4] = { x[3], x[4], x[5], x[6] };
+            euclidean::compose_quat(quat, &step[3], &x[3]);
+            return 1;
+        }
+
         // Create extended state vector as state + dl + dr
         double z[ESS] = {
             x[0],    // x
