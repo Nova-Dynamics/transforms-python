@@ -51,12 +51,18 @@ def dead_reckon_step_errors( dl, dr, vave, vdiff, dl_scale=0.005):
     if ( np.abs(vdiff) >= 1e-3 ) :
         rho = np.abs(np.tanh( vave / vdiff ))
 
-    #  [ var_dl, cov_dldr, var_dr, var_b, var_c, var_d ]
-    return [ ddl*ddl + 1e-8, rho*ddl*ddr, ddr*ddr + 1e-8 ] # TODO : these are estimates, based on gps's 1Hz
+    # TODO : make this configurable in the future
+    # TODO : do we actually need the penalty?
+    # the dq has a rotvec representation [ e1, e2, e3 ], these are the errors therein
+    var_de = 1e-5 # var_de ~ 4*var_dq = (2 * delta_dq)^2 ~ var_ypr
+    #  [ var_dl, cov_dldr, var_dr, var_dqb, var_dqc, var_dqd ]
+    return [ ddl*ddl + 1e-8, rho*ddl*ddr, ddr*ddr + 1e-8, var_de, var_de, var_de ] # TODO : these are estimates, based on gps's 1Hz
 
 def dead_reckon_apply(x_hat, P_hat, step):
     SS = 7 # Full state size
+    ESS = 7 + 2 + 4 # dl/dr and then dq
     SM = 6 # Manifold state size
+    ESM = 6 + 2 + 3 # dl/dr and then de (rotvec of dq)
 
     if (step[1] == 0 and step[2] == 0):
         # If the tracks didn't move, then just update the quaternion-part. There are two reasons dl=dr=0:
@@ -71,23 +77,30 @@ def dead_reckon_apply(x_hat, P_hat, step):
         return np.hstack([x_hat[:3], t.compose_quat(x_hat[3:SS], step[3:SS])]), P_hat.copy()
 
     # Build up extended state vector
-    z = np.zeros((SS+2))
+    z = np.zeros((ESS))
     z[:SS] = x_hat[:]
-    z[SS+0] = step[1]
-    z[SS+1] = step[2]
+    z[SS+0] = step[1] # dl
+    z[SS+1] = step[2] # dr
+    z[SS+2] = step[3] # dq_a
+    z[SS+3] = step[4] # dq_b
+    z[SS+4] = step[5] # dq_c
+    z[SS+5] = step[6] # dq_d
 
     # Build up extended covariance on manifold
-    P_z = np.zeros((SM+2,SM+2))
+    P_z = np.zeros((ESM,ESM))
     P_z[:SM,:SM] = P_hat[:SM,:SM]
     e = dead_reckon_step_errors( step[1], step[2], step[7], step[8] )
     P_z[0+SM][0+SM] = e[0] # var_dl
     P_z[0+SM][1+SM] = e[1] # cov_dldr
     P_z[1+SM][0+SM] = e[1] # cov_dldr
     P_z[1+SM][1+SM] = e[2] # var_dr
+    P_z[2+SM][2+SM] = e[3] # var_de1 (rotvec for dq)
+    P_z[3+SM][3+SM] = e[4] # var_de2 (rotvec for dq)
+    P_z[4+SM][4+SM] = e[5] # var_de3 (rotvec for dq)
 
     # Generate sigma points along manifold from enclosing deviation vectors with the state
-    L = SM+2
-    Z = np.zeros((2*L+1,SS+2))
+    L = ESM
+    Z = np.zeros((2*L+1,ESS))
     Z[0] = z.copy()
 
     scaled_cov = P_z * L_PLUS_LAMBDA
@@ -113,18 +126,26 @@ def dead_reckon_apply(x_hat, P_hat, step):
 
     # extract the mean lrQ part
     lrQ = z[:SS]
+    dquat = z[-4:]
     for i in range(L):
         Z[1 + i][:SS] = t.compose_lrQ(lrQ, t.lrrv2lrQ(dz[i,:SM]))
-        Z[1 + i][-2:] = Z[0,-2:] + dz[i,-2:]
+        Z[1 + i][SS:SS+2] = Z[0,SS:SS+2] + dz[i,SS:SS+2]
+        Z[1 + i][-4:] = t.compose_quat(dquat, t.rotvec2quat(dz[i,-3:]))
 
         Z[1 + i + L][:SS] = t.compose_lrQ(lrQ, t.lrrv2lrQ(-dz[i,:SM]))
-        Z[1 + i + L][-2:] = Z[0,-2:] - dz[i,-2:]
+        Z[1 + i + L][SS:SS+2] = Z[0,SS:SS+2] - dz[i,SS:SS+2]
+        Z[1 + i + L][-4:] = t.compose_quat(dquat, t.rotvec2quat(-dz[i,-3:]))
 
     # Transform to new vectors
     def T(_z):
+        # initial quaternion part
         quat = _z[3:SS]
         dx = dead_reckon_step( quat=quat, dl=z[SS+0], dr=z[SS+1], vave=step[7], vdiff=step[8] )
-        nquat = t.compose_quat(quat,step[3:7])
+        # Post rotation quaternion part
+        nquat = t.compose_quat(quat,_z[-4:])
+
+        # Note, this is basically a compose_lrQ(...) call. dx = quat^-1 @ [dx_body, dy_body, 0]
+        #  so z_new = compose_lrQ(z, [ dx_body, dy_body, 0, dquat ]) = [ z_t + quat^-1@[dx_body, dy_body, 0], quat * dquat ]
         return np.hstack([_z[:3] + dx, nquat]);
 
     Y = np.array([ T(_z) for _z in Z ])

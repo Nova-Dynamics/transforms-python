@@ -15,9 +15,9 @@ constexpr double L_PLUS_LAMBDA = 3;
 
 // State vector size
 constexpr int SS = 4+3;
-constexpr int ESS = 4+3+2;
+constexpr int ESS = 4+3+2+4;
 constexpr int SM = 3+3;
-constexpr int ESM = 3+3+2;
+constexpr int ESM = 3+3+2+3;
 
 double sinc(double x) {
     // Use power series for small x
@@ -66,9 +66,16 @@ namespace dead_reckon {
             rho = std::abs(std::tanh( vave / vdiff ));
         }
 
+        // TODO : make this configurable in the future
+        // TODO : do we actually need the penalty?
+        // the dq has a rotvec representation [ e1, e2, e3 ], these are the errors therein
+        double var_de = 1e-5; // var_de ~ 4*var_dq = (2 * delta_dq)^2 ~ var_ypr
         out[0] = ddl*ddl + 1e-8;
         out[1] = rho*ddl*ddr;
         out[2] = ddr*ddr + 1e-8;
+        out[3] = var_de;
+        out[4] = var_de;
+        out[5] = var_de;
     }
 
     int dead_reckon_apply(double* step, double *x, double *cov) {
@@ -99,9 +106,14 @@ namespace dead_reckon {
             x[6],    // d
             step[1], // dl
             step[2], // dr
+            step[3], // dq_a
+            step[4], // dq_b
+            step[5], // dq_c
+            step[6], // dq_d
+
         };
 
-        double dr_cov[3];
+        double dr_cov[3+3];
         dead_reckon_step_errors(
                 step[1], step[2], // dl, dr
                 step[7], step[8], // vave, vdiff
@@ -110,14 +122,17 @@ namespace dead_reckon {
 
         // Create extended covariance matrix
         double P_z[ESM*ESM] = {
-            cov[0*SM + 0],cov[0*SM + 1],cov[0*SM + 2],cov[0*SM + 3],cov[0*SM + 4],cov[0*SM + 5],0,0,
-            cov[1*SM + 0],cov[1*SM + 1],cov[1*SM + 2],cov[1*SM + 3],cov[1*SM + 4],cov[1*SM + 5],0,0,
-            cov[2*SM + 0],cov[2*SM + 1],cov[2*SM + 2],cov[2*SM + 3],cov[2*SM + 4],cov[2*SM + 5],0,0,
-            cov[3*SM + 0],cov[3*SM + 1],cov[3*SM + 2],cov[3*SM + 3],cov[3*SM + 4],cov[3*SM + 5],0,0,
-            cov[4*SM + 0],cov[4*SM + 1],cov[4*SM + 2],cov[4*SM + 3],cov[4*SM + 4],cov[4*SM + 5],0,0,
-            cov[5*SM + 0],cov[5*SM + 1],cov[5*SM + 2],cov[5*SM + 3],cov[5*SM + 4],cov[5*SM + 5],0,0,
-            0,0,0,0,0,0,dr_cov[0],dr_cov[1],
-            0,0,0,0,0,0,dr_cov[1],dr_cov[2],
+            cov[0*SM + 0],cov[0*SM + 1],cov[0*SM + 2],cov[0*SM + 3],cov[0*SM + 4],cov[0*SM + 5],0,0,0,0,0,
+            cov[1*SM + 0],cov[1*SM + 1],cov[1*SM + 2],cov[1*SM + 3],cov[1*SM + 4],cov[1*SM + 5],0,0,0,0,0,
+            cov[2*SM + 0],cov[2*SM + 1],cov[2*SM + 2],cov[2*SM + 3],cov[2*SM + 4],cov[2*SM + 5],0,0,0,0,0,
+            cov[3*SM + 0],cov[3*SM + 1],cov[3*SM + 2],cov[3*SM + 3],cov[3*SM + 4],cov[3*SM + 5],0,0,0,0,0,
+            cov[4*SM + 0],cov[4*SM + 1],cov[4*SM + 2],cov[4*SM + 3],cov[4*SM + 4],cov[4*SM + 5],0,0,0,0,0,
+            cov[5*SM + 0],cov[5*SM + 1],cov[5*SM + 2],cov[5*SM + 3],cov[5*SM + 4],cov[5*SM + 5],0,0,0,0,0,
+            0,0,0,0,0,0,dr_cov[0],dr_cov[1],0,0,0,
+            0,0,0,0,0,0,dr_cov[1],dr_cov[2],0,0,0,
+            0,0,0,0,0,0,0,0,dr_cov[3],0,0,
+            0,0,0,0,0,0,0,0,0,dr_cov[4],0,
+            0,0,0,0,0,0,0,0,0,0,dr_cov[5]
         };
 
         // Get the sigma points
@@ -142,15 +157,28 @@ namespace dead_reckon {
             euclidean::convert_lrrv_to_lrQ(&R[i*L], dlrQ1);
             euclidean::convert_lrrv_to_lrQ(R_neg_row, dlrQ2);
 
-            // Write into the the sigma point the difference
+            // Extract the ddquat from the last rotvec
+            double ddquat1[4], ddquat2[4], R_neg_row2[3];
+            for ( int j = 0; j < 3; j++ ) {
+                R_neg_row2[j] = -R[i*L + j + (ESM-3)];
+            }
+            euclidean::convert_rotvec_to_quat(&R[i*L+(ESM-3)], ddquat1);
+            euclidean::convert_rotvec_to_quat(R_neg_row2, ddquat2);
+
+            // Write into the the sigma point the lrQ
             euclidean::compose_lrQ(z, dlrQ1,  &Z[(i+1)*n]);
             euclidean::compose_lrQ(z, dlrQ2, &Z[(i+L+1)*n]);
 
-            // Also add in the last two elements
+            // Also add the dl/drs
             Z[(i+1)*n + SS + 0] = z[SS + 0] + R[i*L + SM + 0];
             Z[(i+1)*n + SS + 1] = z[SS + 1] + R[i*L + SM + 1];
             Z[(i+L+1)*n + SS + 0] = z[SS + 0] - R[i*L + SM + 0];
             Z[(i+L+1)*n + SS + 1] = z[SS + 1] - R[i*L + SM + 1];
+
+            // Write into the the sigma point the difference: dquat*ddquat
+            euclidean::compose_quat(&z[ESS-4], ddquat1, &Z[(i+1)*n + (ESS-4)]);
+            euclidean::compose_quat(&z[ESS-4], ddquat2, &Z[(i+L+1)*n + (ESS-4)]);
+
         }
 
         // Transform the sigma points
@@ -164,11 +192,13 @@ namespace dead_reckon {
                 step[8],     // vave
                 &Y[i*SS]     // delta change
             );
+            // Note, this is basically a compose_lrQ(...) call. dx = quat^-1 @ [dx_body, dy_body, 0]
+            //  so Y = compose_lrQ(z, [ dx_body, dy_body, 0, dquat ]) = [ z_t + quat^-1@[dx_body, dy_body, 0], quat * dquat ]
             for ( int j = 0; j < 3; j ++ ) {
                 Y[i*SS + j] += Z[i*n + j]; // add initial value
             }
             // Write over the quaternion part with the new quaterion estimate
-            euclidean::compose_quat(&Z[i*n + 3], &step[3], &Y[i*SS + 3]);
+            euclidean::compose_quat(&Z[i*n + 3], &Z[i*n + (ESS-4)], &Y[i*SS + 3]);
         }
 
         // Iteratively calculate the lrQ mean
