@@ -13,6 +13,9 @@ def sinc(x):
     if (np.abs(x) < 1e-4): return 1 - (x*x/6) + (x*x*x*x/120)
     return np.sin(x)/x
 
+# var_de ~ 4*var_dq = (2 * delta_dq)^2 ~ var_ypr
+MAGIC_ROTVEC_ERROR = 1e-6
+
 DR_D_NOM = 0.464
 DR_LO2G = 0.05
 DR_MU = 0.8
@@ -54,7 +57,7 @@ def dead_reckon_step_errors( dl, dr, vave, vdiff, dl_scale=0.005):
     # TODO : make this configurable in the future
     # TODO : do we actually need the penalty?
     # the dq has a rotvec representation [ e1, e2, e3 ], these are the errors therein
-    var_de = 1e-5 # var_de ~ 4*var_dq = (2 * delta_dq)^2 ~ var_ypr
+    var_de = MAGIC_ROTVEC_ERROR
     #  [ var_dl, cov_dldr, var_dr, var_dqb, var_dqc, var_dqd ]
     return [ ddl*ddl + 1e-8, rho*ddl*ddr, ddr*ddr + 1e-8, var_de, var_de, var_de ] # TODO : these are estimates, based on gps's 1Hz
 

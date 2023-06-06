@@ -5,6 +5,9 @@
 #include "../euclidean/base.h"
 #include "base.h"
 
+// var_de ~ 4*var_dq = (2 * delta_dq)^2 ~ var_ypr
+constexpr double MAGIC_ROTVEC_ERROR = 1e-6;
+
 constexpr double DR_D_NOM = 0.464;
 constexpr double DR_LO2G = 0.05;
 constexpr double DR_MU = 0.8;
@@ -69,7 +72,7 @@ namespace dead_reckon {
         // TODO : make this configurable in the future
         // TODO : do we actually need the penalty?
         // the dq has a rotvec representation [ e1, e2, e3 ], these are the errors therein
-        double var_de = 1e-5; // var_de ~ 4*var_dq = (2 * delta_dq)^2 ~ var_ypr
+        double var_de = MAGIC_ROTVEC_ERROR;
         out[0] = ddl*ddl + 1e-8;
         out[1] = rho*ddl*ddr;
         out[2] = ddr*ddr + 1e-8;
