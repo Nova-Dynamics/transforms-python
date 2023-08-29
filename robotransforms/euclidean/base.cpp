@@ -1,5 +1,5 @@
 #include "base.h"
-#include <math.h>
+#include <cmath>
 #include <algorithm>
 
 // Many thanks to https://stackoverflow.com/a/9324086/13217806
