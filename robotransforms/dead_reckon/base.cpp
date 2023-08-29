@@ -1,4 +1,4 @@
-#include <math.h>
+#include <cmath>
 #include <algorithm>
 
 #include "../utils/base.h"
@@ -143,13 +143,17 @@ namespace dead_reckon {
         // L = length size of covariance: ESM
         int n = ESS;
         int L = ESM;
-        double Z[(2*L+1)*n];
+        double* Z = new double[(2*L+1)*n];
         for ( int i = 0; i < n; i ++ ) {
             Z[0*n + i] = z[i]; // copy in mean
         }
         // Attempt to square-root the scaled covariance
-        double R[L*L];
-        if ( !utils::cholesky( L, L_PLUS_LAMBDA, P_z, R ) ) return 0;
+        double* R = new double[L*L];
+        if ( !utils::cholesky( L, L_PLUS_LAMBDA, P_z, R ) ) {
+            delete[] R;
+            delete[] Z;
+            return 0;
+        }
 
         for ( int i = 0; i < L; i ++ ) {
             // Extract and lrQ from the ith row of the root covariance (which is a manifold deviation)
@@ -185,7 +189,7 @@ namespace dead_reckon {
         }
 
         // Transform the sigma points
-        double Y[(2*L+1)*SS];
+        double* Y = new double[(2*L+1)*SS];
         for ( int i = 0; i < 2*L+1; i ++ ) {
             dead_reckon_step(
                 &Z[i*n + 3], //quat
@@ -218,7 +222,7 @@ namespace dead_reckon {
         double W = 1. / ( 2. * 3. );
         double sq_error = 1.;
         double y_bar_inv[SS];
-        double dY[(2*L+1)*SM];
+        double* dY = new double[(2*L+1)*SM];
         double dlrQ[SS];
         while ( i < MAX && sq_error > EPS ) {
             i += 1;
@@ -269,6 +273,12 @@ namespace dead_reckon {
         for ( int i = 0; i < SS; i++ ) {
             x[i] = Y[i];
         }
+
+        delete[] Z;
+        delete[] Y;
+        delete[] R;
+        delete[] dY;
+
 
         return 1;
     }

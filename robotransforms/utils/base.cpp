@@ -1,4 +1,4 @@
-#include <math.h>
+#include <cmath>
 
 #include "base.h"
 
@@ -72,8 +72,12 @@ namespace utils {
         }
 
         // Attempt to square-root the scaled covariance
-        double R[n*n];
-        if ( !cholesky( n, L_PLUS_LAMBDA, cov, R ) ) return 0;
+        double* R = new double[n*n];
+
+        if ( !cholesky( n, L_PLUS_LAMBDA, cov, R ) ) {
+            delete[] R;
+            return 0;
+        }
         
         for ( int i = 0; i < n; i ++ ) {
             for ( int j = 0; j < n; j ++ ) {
@@ -81,6 +85,8 @@ namespace utils {
                 X[(i+n+1)*n + j] = x[j] - R[i*n + j];
             }
         }
+
+        delete[] R;
 
         return 1;
     }
