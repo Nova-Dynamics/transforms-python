@@ -405,7 +405,7 @@ def homo2lrq(H):
 
 def homo2lrQ(H):
     r = rotmat2quat(H[:3,:3])
-    shift = apply_quat(-r, H[:3,3]) # map shift_prime to shift
+    shift = apply_quat(invert_quat(r), H[:3,3]) # map shift_prime to shift
 
     return np.array([
         -shift[0],

@@ -14,9 +14,9 @@ namespace euclidean {
     // Conversion
     void convert_quat_to_redquat(double *q, double *rq) {
         double sign = 1;
-        if ( q[0] < 0 ) sign = 0;
+        if ( q[0] < 0 ) sign = -1;
         rq[0] = sign*q[1];
-        rq[1] = sign*q[3];
+        rq[1] = sign*q[2];
         rq[2] = sign*q[3];
     }
     void convert_redquat_to_quat(double *rq, double *q) {
