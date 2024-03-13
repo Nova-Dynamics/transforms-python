@@ -200,7 +200,7 @@ def apply_redquat(rq,v):
     return apply_quat(redquat2quat(rq),v)
 
 def apply_rotvec(rv,v):
-    return apply_quat(rotvec2quat(rq),v)
+    return apply_quat(rotvec2quat(rv),v)
 
 def apply_quat(q,v):
     a =             - v[0]*q[1] - v[1]*q[2] - v[2]*q[3]
@@ -572,8 +572,8 @@ def compose_lrq(lrq1, lrq2):
 
 def compose_lrrv(lrrv1, lrrv2):
     rv1 = lrrv1[3:]
-    rv3 = compose_rotvec(rv1, lrv2[3:])
-    location3 = lrv1[:3] + apply_rotvec(invert_rotvec(rv1), lrv2[:3])
+    rv3 = compose_rotvec(rv1, lrrv2[3:])
+    location3 = lrrv1[:3] + apply_rotvec(invert_rotvec(rv1), lrrv2[:3])
     return np.array([
         location3[0],
         location3[1],
