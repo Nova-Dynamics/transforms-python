@@ -3,19 +3,20 @@
 #include "Python.h"
 #include <numpy/arrayobject.h>
 #include <numpy/ndarrayobject.h>
+#include "../types.h"
 #include "base.h"
 
 
 // Vector macros
 #define EXTRACT_2_VECTORS(in1, obj1, arr1, n1, in2, obj2, arr2, n2) \
     if ( !PyArg_ParseTuple(args, "OO", &in1, &in2) ) return NULL; \
-    obj1 = (PyArrayObject *)PyArray_ContiguousFromObject(in1, PyArray_DOUBLE, 1, 1); \
+    obj1 = (PyArrayObject *)PyArray_ContiguousFromObject(in1, RT_ARRAY_DOUBLE, 1, 1); \
     if ( obj1 == NULL ) { \
         Py_XDECREF(obj1); \
         Py_XDECREF(obj2); \
         return NULL; \
     } \
-    obj2 = (PyArrayObject *)PyArray_ContiguousFromObject(in2, PyArray_DOUBLE, 1, 1); \
+    obj2 = (PyArrayObject *)PyArray_ContiguousFromObject(in2, RT_ARRAY_DOUBLE, 1, 1); \
     if ( obj2 == NULL ) { \
         Py_XDECREF(obj1); \
         Py_XDECREF(obj2); \
@@ -54,21 +55,21 @@ static PyObject *name(PyObject *self, PyObject *args) { \
 
 #define EXTRACT_3_VECTORS(in1, obj1, arr1, n1, in2, obj2, arr2, n2, in3, obj3, arr3, n3) \
     if ( !PyArg_ParseTuple(args, "OOO", &in1, &in2, &in3) ) return NULL; \
-    obj1 = (PyArrayObject *)PyArray_ContiguousFromObject(in1, PyArray_DOUBLE, 1, 1); \
+    obj1 = (PyArrayObject *)PyArray_ContiguousFromObject(in1, RT_ARRAY_DOUBLE, 1, 1); \
     if ( obj1 == NULL ) { \
         Py_XDECREF(obj1); \
         Py_XDECREF(obj2); \
         Py_XDECREF(obj3); \
         return NULL; \
     } \
-    obj2 = (PyArrayObject *)PyArray_ContiguousFromObject(in2, PyArray_DOUBLE, 1, 1); \
+    obj2 = (PyArrayObject *)PyArray_ContiguousFromObject(in2, RT_ARRAY_DOUBLE, 1, 1); \
     if ( obj2 == NULL ) { \
         Py_XDECREF(obj1); \
         Py_XDECREF(obj2); \
         Py_XDECREF(obj3); \
         return NULL; \
     } \
-    obj3 = (PyArrayObject *)PyArray_ContiguousFromObject(in3, PyArray_DOUBLE, 1, 1); \
+    obj3 = (PyArrayObject *)PyArray_ContiguousFromObject(in3, RT_ARRAY_DOUBLE, 1, 1); \
     if ( obj3 == NULL ) { \
         Py_XDECREF(obj1); \
         Py_XDECREF(obj2); \

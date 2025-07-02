@@ -4,6 +4,7 @@
 #include <numpy/arrayobject.h>
 #include <numpy/ndarrayobject.h>
 
+#include "../types.h"
 #include "base.h"
 
 static PyObject *dr_calculate_d(PyObject *self, PyObject *args) {
@@ -23,13 +24,13 @@ static PyObject *dead_reckon_step(PyObject *self, PyObject *args) {
     double *arr1, *arr2;
 
     if ( !PyArg_ParseTuple(args, "OddddO", &in1, _dl, _dr, _vave, _vdiff,  &in2 ) ) return NULL;
-    obj1 = (PyArrayObject *)PyArray_ContiguousFromObject(in1, PyArray_DOUBLE, 1, 1);
+    obj1 = (PyArrayObject *)PyArray_ContiguousFromObject(in1, RT_ARRAY_DOUBLE, 1, 1);
     if ( obj1 == NULL ) {
         Py_XDECREF(obj1);
         Py_XDECREF(obj2);
         return NULL;
     }
-    obj2 = (PyArrayObject *)PyArray_ContiguousFromObject(in2, PyArray_DOUBLE, 1, 1);
+    obj2 = (PyArrayObject *)PyArray_ContiguousFromObject(in2, RT_ARRAY_DOUBLE, 1, 1);
     if ( obj2 == NULL ) {
         Py_XDECREF(obj1);
         Py_XDECREF(obj2);
@@ -68,7 +69,7 @@ static PyObject *dead_reckon_step_errors(PyObject *self, PyObject *args) {
     double *arr1;
 
     if ( !PyArg_ParseTuple(args, "dddddO", _dl, _dr, _vave, _vdiff, _dl_scale,  &in1 ) ) return NULL;
-    obj1 = (PyArrayObject *)PyArray_ContiguousFromObject(in1, PyArray_DOUBLE, 1, 1);
+    obj1 = (PyArrayObject *)PyArray_ContiguousFromObject(in1, RT_ARRAY_DOUBLE, 1, 1);
     if ( obj1 == NULL ) {
         Py_XDECREF(obj1);
         return NULL;
@@ -96,7 +97,7 @@ static PyObject *dead_reckon_apply(PyObject *self, PyObject *args) {
     double *arr1, *arr2, *arr3, *arr4, *arr5;
 
     if ( !PyArg_ParseTuple(args, "OOOOO", &in1, &in2, &in3, &in4, &in5 ) ) return NULL;
-    obj1 = (PyArrayObject *)PyArray_ContiguousFromObject(in1, PyArray_DOUBLE, 1, 1);
+    obj1 = (PyArrayObject *)PyArray_ContiguousFromObject(in1, RT_ARRAY_DOUBLE, 1, 1);
     if ( obj1 == NULL ) {
         Py_XDECREF(obj1);
         Py_XDECREF(obj2);
@@ -105,7 +106,7 @@ static PyObject *dead_reckon_apply(PyObject *self, PyObject *args) {
         Py_XDECREF(obj5);
         return NULL;
     }
-    obj2 = (PyArrayObject *)PyArray_ContiguousFromObject(in2, PyArray_DOUBLE, 1, 1);
+    obj2 = (PyArrayObject *)PyArray_ContiguousFromObject(in2, RT_ARRAY_DOUBLE, 1, 1);
     if ( obj2 == NULL ) {
         Py_XDECREF(obj1);
         Py_XDECREF(obj2);
@@ -114,7 +115,7 @@ static PyObject *dead_reckon_apply(PyObject *self, PyObject *args) {
         Py_XDECREF(obj5);
         return NULL;
     }
-    obj3 = (PyArrayObject *)PyArray_ContiguousFromObject(in3, PyArray_DOUBLE, 2, 2);
+    obj3 = (PyArrayObject *)PyArray_ContiguousFromObject(in3, RT_ARRAY_DOUBLE, 2, 2);
     if ( obj3 == NULL ) {
         Py_XDECREF(obj1);
         Py_XDECREF(obj2);
@@ -123,7 +124,7 @@ static PyObject *dead_reckon_apply(PyObject *self, PyObject *args) {
         Py_XDECREF(obj5);
         return NULL;
     }
-    obj4 = (PyArrayObject *)PyArray_ContiguousFromObject(in4, PyArray_DOUBLE, 1, 1);
+    obj4 = (PyArrayObject *)PyArray_ContiguousFromObject(in4, RT_ARRAY_DOUBLE, 1, 1);
     if ( obj4 == NULL ) {
         Py_XDECREF(obj1);
         Py_XDECREF(obj2);
@@ -132,7 +133,7 @@ static PyObject *dead_reckon_apply(PyObject *self, PyObject *args) {
         Py_XDECREF(obj5);
         return NULL;
     }
-    obj5 = (PyArrayObject *)PyArray_ContiguousFromObject(in5, PyArray_DOUBLE, 2, 2);
+    obj5 = (PyArrayObject *)PyArray_ContiguousFromObject(in5, RT_ARRAY_DOUBLE, 2, 2);
     if ( obj5 == NULL ) {
         Py_XDECREF(obj1);
         Py_XDECREF(obj2);
@@ -219,21 +220,21 @@ static PyObject *dead_reckon_apply_ip(PyObject *self, PyObject *args) {
     double *arr1, *arr2, *arr3;
 
     if ( !PyArg_ParseTuple(args, "OOO", &in1, &in2, &in3 ) ) return NULL;
-    obj1 = (PyArrayObject *)PyArray_ContiguousFromObject(in1, PyArray_DOUBLE, 1, 1);
+    obj1 = (PyArrayObject *)PyArray_ContiguousFromObject(in1, RT_ARRAY_DOUBLE, 1, 1);
     if ( obj1 == NULL ) {
         Py_XDECREF(obj1);
         Py_XDECREF(obj2);
         Py_XDECREF(obj3);
         return NULL;
     }
-    obj2 = (PyArrayObject *)PyArray_ContiguousFromObject(in2, PyArray_DOUBLE, 1, 1);
+    obj2 = (PyArrayObject *)PyArray_ContiguousFromObject(in2, RT_ARRAY_DOUBLE, 1, 1);
     if ( obj2 == NULL ) {
         Py_XDECREF(obj1);
         Py_XDECREF(obj2);
         Py_XDECREF(obj3);
         return NULL;
     }
-    obj3 = (PyArrayObject *)PyArray_ContiguousFromObject(in3, PyArray_DOUBLE, 2, 2);
+    obj3 = (PyArrayObject *)PyArray_ContiguousFromObject(in3, RT_ARRAY_DOUBLE, 2, 2);
     if ( obj3 == NULL ) {
         Py_XDECREF(obj1);
         Py_XDECREF(obj2);
@@ -296,7 +297,7 @@ static PyObject *_dead_reckon(PyObject *self, PyObject *args) {
     bool steps_empty = n_steps < 1;
 
     if ( !steps_empty ) {
-        obj1 = (PyArrayObject *)PyArray_ContiguousFromObject(in1, PyArray_DOUBLE, 2, 2);
+        obj1 = (PyArrayObject *)PyArray_ContiguousFromObject(in1, RT_ARRAY_DOUBLE, 2, 2);
         if ( obj1 == NULL ) {
             Py_XDECREF(obj1);
             Py_XDECREF(obj2);
@@ -306,7 +307,7 @@ static PyObject *_dead_reckon(PyObject *self, PyObject *args) {
             return NULL;
         }
     }
-    obj2 = (PyArrayObject *)PyArray_ContiguousFromObject(in2, PyArray_DOUBLE, 1, 1);
+    obj2 = (PyArrayObject *)PyArray_ContiguousFromObject(in2, RT_ARRAY_DOUBLE, 1, 1);
     if ( obj2 == NULL ) {
         if ( !steps_empty ) Py_XDECREF(obj1);
         Py_XDECREF(obj2);
@@ -315,7 +316,7 @@ static PyObject *_dead_reckon(PyObject *self, PyObject *args) {
         Py_XDECREF(obj5);
         return NULL;
     }
-    obj3 = (PyArrayObject *)PyArray_ContiguousFromObject(in3, PyArray_DOUBLE, 2, 2);
+    obj3 = (PyArrayObject *)PyArray_ContiguousFromObject(in3, RT_ARRAY_DOUBLE, 2, 2);
     if ( obj3 == NULL ) {
         if ( !steps_empty ) Py_XDECREF(obj1);
         Py_XDECREF(obj2);
@@ -324,7 +325,7 @@ static PyObject *_dead_reckon(PyObject *self, PyObject *args) {
         Py_XDECREF(obj5);
         return NULL;
     }
-    obj4 = (PyArrayObject *)PyArray_ContiguousFromObject(in4, PyArray_DOUBLE, 1, 1);
+    obj4 = (PyArrayObject *)PyArray_ContiguousFromObject(in4, RT_ARRAY_DOUBLE, 1, 1);
     if ( obj4 == NULL ) {
         if ( !steps_empty ) Py_XDECREF(obj1);
         Py_XDECREF(obj2);
@@ -333,7 +334,7 @@ static PyObject *_dead_reckon(PyObject *self, PyObject *args) {
         Py_XDECREF(obj5);
         return NULL;
     }
-    obj5 = (PyArrayObject *)PyArray_ContiguousFromObject(in5, PyArray_DOUBLE, 2, 2);
+    obj5 = (PyArrayObject *)PyArray_ContiguousFromObject(in5, RT_ARRAY_DOUBLE, 2, 2);
     if ( obj5 == NULL ) {
         if ( !steps_empty ) Py_XDECREF(obj1);
         Py_XDECREF(obj2);
@@ -426,21 +427,21 @@ static PyObject *_dead_reckon(PyObject *self, PyObject *args) {
 //     int _n_steps[1];
 //
 //     if ( !PyArg_ParseTuple(args, "iOOO", _n_steps, &in1, &in2, &in3 ) ) return NULL;
-//     obj1 = (PyArrayObject *)PyArray_ContiguousFromObject(in1, PyArray_DOUBLE, 2, 2);
+//     obj1 = (PyArrayObject *)PyArray_ContiguousFromObject(in1, RT_ARRAY_DOUBLE, 2, 2);
 //     if ( obj1 == NULL ) {
 //         Py_XDECREF(obj1);
 //         Py_XDECREF(obj2);
 //         Py_XDECREF(obj3);
 //         return NULL;
 //     }
-//     obj2 = (PyArrayObject *)PyArray_ContiguousFromObject(in2, PyArray_DOUBLE, 1, 1);
+//     obj2 = (PyArrayObject *)PyArray_ContiguousFromObject(in2, RT_ARRAY_DOUBLE, 1, 1);
 //     if ( obj2 == NULL ) {
 //         Py_XDECREF(obj1);
 //         Py_XDECREF(obj2);
 //         Py_XDECREF(obj3);
 //         return NULL;
 //     }
-//     obj3 = (PyArrayObject *)PyArray_ContiguousFromObject(in3, PyArray_DOUBLE, 2, 2);
+//     obj3 = (PyArrayObject *)PyArray_ContiguousFromObject(in3, RT_ARRAY_DOUBLE, 2, 2);
 //     if ( obj3 == NULL ) {
 //         Py_XDECREF(obj1);
 //         Py_XDECREF(obj2);
