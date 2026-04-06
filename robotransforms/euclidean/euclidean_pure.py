@@ -189,6 +189,11 @@ def rotvec2quat(rotvec):
 #
 #     return q
 
+def quat2rp(quat):
+    return 2 * np.array(quat[1:]) / quat[0]
+def rp2quat(rp):
+    return np.array([2, rp[0], rp[1], rp[2]])/np.sqrt(1 + np.sum(rp**2))
+
 # ------------------------------------------
 #  Applications
 # ------------------------------------------
